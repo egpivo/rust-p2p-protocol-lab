@@ -1,0 +1,8 @@
+[workspace]
+members = [
+  "crates/tcp-echo",
+  "crates/tcp-chat",
+  "crates/framed-protocol",
+]
+resolver = "2"
+
