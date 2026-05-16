@@ -1,5 +1,13 @@
 use tokio::net::TcpListener;
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+fn encode_frame(payload: &[u8]) -> Vec<u8> {
+    let len = payload.len() as u32;
+    let mut out = Vec::with_capacity(4 + len as usize);
+    out.extend_from_slice(&len.to_be_bytes());
+    out.extend_from_slice(payload);
+    out
+}
 
 #[tokio::main]
 async fn main() -> std::io::Result<()>{
@@ -32,6 +40,10 @@ async fn main() -> std::io::Result<()>{
                     return;
                 }
                 println!("from {client_addr}: {len} bytes", len = body.len());
+                let reply = encode_frame(&body);
+                if let Err(e) = stream.write_all(&reply).await {
+                    eprintln!("failed to write to {client_addr}: {e}");
+                }
             }
         });
     }
