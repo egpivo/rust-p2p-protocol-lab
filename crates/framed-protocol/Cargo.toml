@@ -4,3 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+tokio = { version = "1.52.3", features = ["full"] }
+
+[[bin]]
+name = "framed-client"
+path = "src/bin/client.rs"
