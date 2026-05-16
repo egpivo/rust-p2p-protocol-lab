@@ -1,17 +1,10 @@
 use tokio::net::TcpListener;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use framed_protocol::{MAX_PAYLOAD, encode_frame};
 
-fn encode_frame(payload: &[u8]) -> Vec<u8> {
-    let len = payload.len() as u32;
-    let mut out = Vec::with_capacity(4 + len as usize);
-    out.extend_from_slice(&len.to_be_bytes());
-    out.extend_from_slice(payload);
-    out
-}
 
 #[tokio::main]
 async fn main() -> std::io::Result<()>{
-    const MAX_PAYLOAD: u32 = 64 * 1024;
     let addr = "127.0.0.1:7002";
     let listener = TcpListener::bind(addr).await?;
     println!("Listening on {addr}");
@@ -43,6 +36,7 @@ async fn main() -> std::io::Result<()>{
                 let reply = encode_frame(&body);
                 if let Err(e) = stream.write_all(&reply).await {
                     eprintln!("failed to write to {client_addr}: {e}");
+                    return;
                 }
             }
         });

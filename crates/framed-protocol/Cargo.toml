@@ -2,6 +2,7 @@
 name = "framed-protocol"
 version = "0.1.0"
 edition = "2024"
+default-run = "framed-protocol"
 
 [dependencies]
 tokio = { version = "1.52.3", features = ["full"] }
