@@ -31,9 +31,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "framed-core"
+version = "0.1.0"
+
+[[package]]
+name = "framed-kv"
+version = "0.1.0"
+dependencies = [
+ "framed-core",
+ "tokio",
+]
+
+[[package]]
 name = "framed-protocol"
 version = "0.1.0"
 dependencies = [
+ "framed-core",
  "tokio",
 ]
 

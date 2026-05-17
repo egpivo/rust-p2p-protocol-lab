@@ -1,13 +1,13 @@
 [package]
-name = "framed-protocol"
+name = "framed-kv"
 version = "0.1.0"
 edition = "2024"
-default-run = "framed-protocol"
+default-run = "framed-kv"
 
 [dependencies]
 tokio = { version = "1.52.3", features = ["full"] }
 framed-core = { path = "../framed-core" }
 
 [[bin]]
-name = "framed-client"
+name = "kv-client"
 path = "src/bin/client.rs"

@@ -4,8 +4,8 @@ use framed_core::{MAX_PAYLOAD, encode_frame};
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
-    let mut stream = TcpStream::connect("127.0.0.1:7002").await?;
-    let frame = encode_frame(b"hello");
+    let mut stream = TcpStream::connect("127.0.0.1:7003").await?;
+    let frame = encode_frame(b"PING");
     stream.write_all(&frame).await?;
 
     let mut len_buf = [0u8; 4];

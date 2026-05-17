@@ -3,6 +3,7 @@ members = [
   "crates/tcp-echo",
   "crates/tcp-chat",
   "crates/framed-protocol",
+  "crates/framed-kv",
+  "crates/framed-core",
 ]
 resolver = "2"
-
