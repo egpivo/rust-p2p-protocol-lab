@@ -2,16 +2,22 @@ use tokio::net::TcpListener;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use framed_core::{MAX_PAYLOAD, encode_frame};
 use std::str::from_utf8;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let addr = "127.0.0.1:7003";
     let listener = TcpListener::bind(addr).await?;
     println!("Listening on {addr}");
+    let store = Arc::new(Mutex::new(HashMap::<String, String>::new()));
+
     loop {
 
         let (mut stream, client_addr) = listener.accept().await?;
         println!("client connected: {client_addr}");
+        let store = store.clone();
 
         tokio::spawn(async move {
             let mut len_buf = [0u8; 4];
@@ -31,24 +37,35 @@ async fn main() -> std::io::Result<()> {
                     return;
                 }
                 println!("from {client_addr}: {payload_len} bytes");
-
                 let cmd = from_utf8(&body)
-                    .map_err(|_| ())
                     .ok()
                     .map(str::trim);
+    
+                let Some(text) = cmd else {
+                    eprintln!("invalid utf-8 from {client_addr}");
+                    continue;
+                };
+                let parts: Vec<&str> = text.split_whitespace().collect();
 
-                let response: &[u8] = match cmd {
-                    Some("PING") => b"PONG",
-                    Some(other) => {
-                        eprintln!("unknown command from {client_addr}: {other}");
-                        continue;
+                let response: Vec<u8> = match parts.as_slice() {
+                    ["PING"] => b"PONG".to_vec(),
+                    ["GET", key] => {
+                        let guard = store.lock().unwrap();
+                        match guard.get(*key) {
+                            Some(v) => format!("VALUE {v}").into_bytes(),
+                            None => b"NOT_FOUND".to_vec(),
+                        }
                     }
-                    None => {
-                        eprintln!("invalid utf-8 from {client_addr}");
+                    ["PUT", key, value] => {
+                        store.lock().unwrap().insert(key.to_string(), value.to_string());
+                        b"OK".to_vec()
+                    }
+                    other => {
+                        eprintln!("unknown command from {client_addr}: {:?}", other);
                         continue;
                     }
                 };
-                let reply = encode_frame(response);
+                let reply = encode_frame(&response);
                 if let Err(e) = stream.write_all(&reply).await {
                     eprintln!("write to {client_addr}: {e}");
                     return;
