@@ -1,0 +1,13 @@
+[package]
+name = "framed-chat"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1.52.3", features = ["full"] }
+tokio-rustls = "0.26"
+rustls = "0.23"
+rcgen = "0.13"
+sha2 = "0.10"
+hex = "0.4"
+framed-core = { path = "../framed-core" }
