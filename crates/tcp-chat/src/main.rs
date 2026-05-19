@@ -8,7 +8,7 @@ use std::net::SocketAddr;
 async fn main() -> std::io::Result<()> {
     let addr = "127.0.0.1:7001";
     let listener = TcpListener::bind(addr).await?;
-    let (tx, _rx) = broadcast::channel::<(SocketAddr,String)>(100);
+    let (tx, _rx) = broadcast::channel::<(SocketAddr, String)>(100);
 
     println!("Listening on {addr}");
 
