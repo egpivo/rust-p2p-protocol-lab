@@ -73,7 +73,7 @@ async fn main() -> std::io::Result<()> {
     let name = &args[1];
     let message = args.get(2);
 
-    let stream = TcpStream::connect("127.0.0.1:7004").await?;
+    let stream = TcpStream::connect("127.0.0.1:8888").await?;
     let hash_hex = std::fs::read_to_string("cert.hash").unwrap();
     let expected_hash = hex::decode(hash_hex.trim()).expect("cert.hash should be hex-encoded");
     let connector = make_tls_connector(expected_hash);
