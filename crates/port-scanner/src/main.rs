@@ -5,6 +5,8 @@ use tokio::net::TcpStream;
 use tokio::task::JoinSet;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use ipnet::IpNet;
+use std::sync::Arc;
+use tokio::sync::Semaphore;
 
 
 #[tokio::main]
@@ -22,11 +24,15 @@ async fn main() {
         vec![IpAddr::from_str(target).expect("invalid IP")]
     };
 
+    let sem = Arc::new(Semaphore::new(100));
+
     for ip in ips {
         let mut set = JoinSet::new();
 
         for port in start_port..=end_port {
+            let sem = sem.clone();
             set.spawn(async move {
+                let _permit = sem.acquire().await.unwrap();
                 let result = tokio::time::timeout(
                     Duration::from_millis(500),
                     TcpStream::connect((ip, port)),
