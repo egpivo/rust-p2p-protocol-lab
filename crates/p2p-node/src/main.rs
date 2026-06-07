@@ -126,7 +126,7 @@ async fn handle_inbound(
     let remote_id = match serde_json::from_str::<Message>(line.trim()) {
         Ok(Message::Hello { node_id: rid, listen_addr, peers: their_peers }) => {
             let mut p = peers.lock().unwrap();
-            if p.len() < MAX_PEERS && !p.contains(&listen_addr) {
+            if listen_addr.port() != 0 && p.len() < MAX_PEERS && !p.contains(&listen_addr) {
                 p.push(listen_addr);
             }
             for addr in their_peers {
