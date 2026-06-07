@@ -9,6 +9,6 @@ members = [
   "crates/port-scanner",
   "crates/tcp-proxy",
   "crates/ids",
-  "crates/honeypot",
+  "crates/honeypot", "crates/brute-forcer",
 ]
 resolver = "2"
