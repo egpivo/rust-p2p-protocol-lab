@@ -4,6 +4,6 @@ members = [
   "crates/tcp-chat",
   "crates/framed-protocol",
   "crates/framed-kv",
-  "crates/framed-core", "crates/framed-chat", "crates/port-scanner", "crates/tcp-proxy",
+  "crates/framed-core", "crates/framed-chat", "crates/port-scanner", "crates/tcp-proxy", "crates/ids",
 ]
 resolver = "2"
