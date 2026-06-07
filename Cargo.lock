@@ -429,6 +429,11 @@ dependencies = [
 [[package]]
 name = "p2p-lab"
 version = "0.1.0"
+dependencies = [
+ "p2p-core",
+ "serde_json",
+ "tokio",
+]
 
 [[package]]
 name = "p2p-node"
