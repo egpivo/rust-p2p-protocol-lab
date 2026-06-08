@@ -92,7 +92,8 @@ async fn main() {
         loop {
             if let Ok((stream, peer_addr)) = listener.accept().await {
                 let peers = peers_clone.clone();
-                tokio::spawn(handle_inbound(stream, peer_addr, node_id, port, peers));
+                let blocklist: p2p_node::BlockList = Arc::new(Mutex::new(std::collections::HashSet::new()));
+                tokio::spawn(handle_inbound(stream, peer_addr, node_id, port, peers, blocklist.clone()));
             }
         }
     });

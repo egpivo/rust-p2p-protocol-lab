@@ -55,6 +55,27 @@ async fn main() {
                 println!("  {k}: {v:.1}");
             }
         }
+        "partition" => {
+            println!("Attack: NetworkPartition");
+
+            // split nodes into two halves
+            let half = honest / 2;
+            let group_a: Vec<usize> = (0..half).collect();
+            let group_b: Vec<usize> = (half..honest).collect();
+
+            println!("Group A: {:?}", group_a);
+            println!("Group B: {:?}", group_b);
+
+            let attack = p2p_env::NetworkPartitionAttack { group_a, group_b };
+            let result = attack.execute(&env).await;
+
+            println!("\n=== Result ===");
+            println!("{}", result.summary);
+            println!("Success: {}", result.success);
+            for (k, v) in &result.metrics {
+                println!("  {k}: {v:.1}");
+            }
+        }
         other => {
             eprintln!("Unknown attack: {other}");
             std::process::exit(1);

@@ -59,9 +59,9 @@ impl NetworkEnv {
         for i in 0..self.config.honest_nodes {
             let port = self.config.base_port + i as u16;
             let seeds = if i == 0 { vec![] } else { vec![seed] };
-            let task = spawn_node(port, seeds).await;
+            let (task, blocklist) = spawn_node(port, seeds).await;
             let addr = format!("127.0.0.1:{port}").parse().unwrap();
-            self.nodes.push(NodeHandle { port, addr, task});
+            self.nodes.push(NodeHandle { port, addr, blocklist, task});
         }
     }
 
@@ -73,11 +73,15 @@ impl NetworkEnv {
 pub struct NodeHandle {
     pub port: u16,
     pub addr: SocketAddr,
+    pub blocklist: p2p_node::BlockList,
     task: tokio::task::JoinHandle<()>,
 }
 
-pub async fn spawn_node(port: u16, seeds: Vec<SocketAddr>) -> tokio::task::JoinHandle<()> {
-    tokio::spawn(async move {
+pub async fn spawn_node(port: u16, seeds: Vec<SocketAddr>) -> (tokio::task::JoinHandle<()>, p2p_node::BlockList) {
+    let blocklist: p2p_node::BlockList = Arc::new(Mutex::new(std::collections::HashSet::new()));
+    let blocklist_inner = blocklist.clone();
+
+    let handle = tokio::spawn(async move {
         let node_id = NodeId::random();
         let peers: PeerList = Arc::new(Mutex::new(Vec::new()));
         let listen_addr = format!("127.0.0.1:{port}");
@@ -133,17 +137,19 @@ pub async fn spawn_node(port: u16, seeds: Vec<SocketAddr>) -> tokio::task::JoinH
                         }
                     }
                 }
-            });         
+            });
         }
 
         // accept inbound
         loop {
             if let Ok((stream, peer_addr)) = listener.accept().await {
                 let peers = peers.clone();
-                tokio::spawn(handle_inbound(stream, peer_addr, node_id, port, peers));
+                let bl = blocklist_inner.clone();
+                tokio::spawn(handle_inbound(stream, peer_addr, node_id, port, peers, bl));
             }
         }
-    })
+    });
+    (handle, blocklist)
 }
 
 pub struct SybilAttack {
@@ -290,4 +296,63 @@ impl EclipseAttack {
 
 impl Attack for EclipseAttack {
     fn name(&self) -> &str { "Eclipse" }
+}
+
+pub struct NetworkPartitionAttack {
+    pub group_a: Vec<usize>,
+    pub group_b: Vec<usize>,
+}
+
+impl NetworkPartitionAttack {
+    pub async fn execute(&self, env: &NetworkEnv) -> AttackResult {
+        // collect IPs of each group
+        let addrs_a: Vec<_> = self.group_a.iter().map(|&i| env.nodes[i].addr).collect();
+        let addrs_b: Vec<_> = self.group_b.iter().map(|&i| env.nodes[i].addr).collect();
+
+        // block group_b IPs on all group_a nodes
+        for &i in &self.group_a {
+            let mut bl = env.nodes[i].blocklist.lock().unwrap();
+            for addr in &addrs_b {
+                bl.insert(addr.ip());
+            }
+        }
+
+        // block group_a IPs on all group_b nodes
+        for &i in &self.group_b {
+            let mut bl = env.nodes[i].blocklist.lock().unwrap();
+            for addr in &addrs_a {
+                bl.insert(addr.ip());
+            }
+        }
+
+        let mut metrics = HashMap::new();
+        metrics.insert("group_a_size".to_string(), self.group_a.len() as f64);
+        metrics.insert("group_b_size".to_string(), self.group_b.len() as f64);
+
+        // wait for partition to take effect
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+        // verify: query group_a node, check if group_b addrs still appear
+        let a_peers: Vec<SocketAddr> = query_peers(addrs_a[0]).await.unwrap_or_default();
+        let cross_peers = a_peers.iter()
+            .filter(|p| addrs_b.iter().any(|b| b.port() == p.port()))
+            .count();
+        
+        metrics.insert("cross_peers_remaining".to_string(), cross_peers as f64);
+        let partitioned = cross_peers == 0;
+        
+        AttackResult {
+            success: partitioned,
+            metrics,
+            summary: format!(
+                "Network partitioned: group_a={:?} isolated from group_b={:?}",
+                self.group_a, self.group_b,
+            ),
+        }
+
+    }
+}
+
+impl Attack for NetworkPartitionAttack {
+    fn name(&self) -> &str { "NetworkPartition" } 
 }

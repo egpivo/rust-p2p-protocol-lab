@@ -3,9 +3,13 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use tokio::net::TcpStream;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use std::net::IpAddr;
+use std::collections::HashSet;
 
 pub type PeerList = Arc<Mutex<Vec<SocketAddr>>>;
+pub type BlockList = Arc<Mutex<HashSet<IpAddr>>>;
 pub const MAX_PEERS: usize = 8;
+
 
 pub async fn send_msg(stream: &mut TcpStream, msg: &Message) -> std::io::Result<()> {
     let mut line = serde_json::to_string(msg).unwrap();
@@ -20,7 +24,9 @@ pub async fn handle_inbound(
     node_id: NodeId,
     port: u16,
     peers: PeerList,
+    blocklist: BlockList,
 ) {
+    if blocklist.lock().unwrap().contains(&peer_addr.ip()) { return; }
     // receive their Hello first
     let (read_half, mut write_half) = stream.into_split();
     let mut reader = BufReader::new(read_half);
@@ -78,3 +84,4 @@ pub async fn handle_inbound(
 
     println!("[{}] connection closed from {}", node_id.0, peer_addr);
 }
+
