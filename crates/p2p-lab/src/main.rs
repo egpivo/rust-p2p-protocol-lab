@@ -17,6 +17,10 @@ async fn main() {
             let count: usize = args[3].parse().unwrap();
             sybil_attack(target, count).await;
         }
+        "monitor" => {
+            let target: SocketAddr = args[2].parse().unwrap();
+            monitor(target).await;
+        }
         _ => eprintln!("Usage: p2p-lab <crawl|sybil> <addr> [count]"),
     }
 }
@@ -132,4 +136,59 @@ async fn sybil_attack(target: SocketAddr, count: usize) {
 
     tokio::signal::ctrl_c().await.unwrap();
     for h in handles { h.abort() };
+}
+
+async fn monitor(target: SocketAddr) {
+    println!("Monitoring {target}...");
+    
+    loop {
+        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+
+        let peers = match query_peers(target).await {
+            Some(p) => p,
+            None => {
+                println!("[WARN] target unreachable");
+                continue;
+            }
+        };
+
+        if peers.is_empty() {
+            println!("peer list empty");
+            continue
+        }
+
+        // count how many peers share the same IP
+        let mut ip_count: std::collections::HashMap<std::net::IpAddr, usize> = 
+            std::collections::HashMap::new();
+        
+        for peer in &peers {
+            *ip_count.entry(peer.ip()).or_default() += 1;
+        }
+
+        // find the dominant IP
+        let (dominant_ip, dominant_count) = ip_count
+            .iter()
+            .max_by_key(|(_, c)| *c)
+            .unwrap();
+        
+        let concentration = *dominant_count as f64 / peers.len() as f64 * 100.0;
+
+        println!(
+            "[monitor] peers={} dominant_ip={} ({}/{} = {:.0}%)",
+            peers.len(),
+            dominant_ip,
+            dominant_count,
+            peers.len(),
+            concentration
+        );
+
+        if concentration >= 50.0 {
+            println!("[WARN] Peer table concentration: {:.0}% from {}", concentration, dominant_ip);
+        }
+        if concentration >= 100.0 {
+            println!("[ALERT] Possible Eclipse setup - all peers from same IP!");
+        }
+
+    }   
+
 }
