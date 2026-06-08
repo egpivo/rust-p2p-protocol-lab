@@ -29,8 +29,11 @@ async fn main() {
             println!("Attack: Sybil");
             println!("Target node: {}", target);
             println!("Sybil count: {}", sybil_count);
-            
-            let attack = p2p_env::SybilAttack { target_index: target, count: sybil_count };
+
+            let attack = p2p_env::SybilAttack {
+                target_index: target,
+                count: sybil_count,
+            };
             let result = attack.execute(&env).await;
 
             println!("\n=== Result ===");
@@ -44,8 +47,11 @@ async fn main() {
             println!("Attack: Eclipse");
             println!("Target node: {}", target);
             println!("Sybil count: {}", sybil_count);
-            
-            let attack = p2p_env::EclipseAttack { target_index: target, sybil_count };
+
+            let attack = p2p_env::EclipseAttack {
+                target_index: target,
+                sybil_count,
+            };
             let result = attack.execute(&env).await;
 
             println!("\n=== Result ===");
@@ -89,9 +95,8 @@ fn flag<T: std::str::FromStr>(args: &[String], name: &str) -> Option<T> {
         .and_then(|w| w[1].parse().ok())
 }
 
-fn flag_str<'a>(args: &'a[String], name: &str) -> Option<&'a str> {
+fn flag_str<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
     args.windows(2)
         .find(|w| w[0] == name)
         .map(|w| w[1].as_str())
 }
-

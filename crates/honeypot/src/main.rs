@@ -1,8 +1,7 @@
-use tokio::net::{TcpListener, TcpStream};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::fs::OpenOptions;
 use std::net::SocketAddr;
-
+use tokio::fs::OpenOptions;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{TcpListener, TcpStream};
 
 #[tokio::main]
 async fn main() {
@@ -20,24 +19,30 @@ async fn main() {
 
 async fn handle(mut stream: TcpStream, peer: SocketAddr) {
     // banner
-    if stream.write_all(b"SSH-2.0-OpenSSH_9.6\r\n").await.is_err() { return; }
+    if stream.write_all(b"SSH-2.0-OpenSSH_9.6\r\n").await.is_err() {
+        return;
+    }
 
     // prompt username
-    if stream.write_all(b"login: ").await.is_err() { return; }
+    if stream.write_all(b"login: ").await.is_err() {
+        return;
+    }
     let user = match read_line(&mut stream, &mut Vec::new()).await {
         Some(u) => u,
         None => return,
     };
 
     // prompt password
-    if stream.write_all(b"Password: ").await.is_err() { return; }
+    if stream.write_all(b"Password: ").await.is_err() {
+        return;
+    }
     let pass = match read_line(&mut stream, &mut Vec::new()).await {
         Some(s) => s,
         None => return,
     };
 
     // log
-    let log_line = format! (
+    let log_line = format!(
         "{} | ip={} | user={:?} | pass={:?}\n",
         chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
         peer,
@@ -51,10 +56,10 @@ async fn handle(mut stream: TcpStream, peer: SocketAddr) {
         .open("honeypot.log")
         .await
         .unwrap();
-    
+
     file.write_all(log_line.as_bytes()).await.unwrap();
     println!("HONEYPOT | ip={peer} | user={user:?} | pass={pass:?}");
-    
+
     // reject
     let _ = stream.write_all(b"Authentication failed\n\n").await;
 }
@@ -64,7 +69,9 @@ async fn read_line(stream: &mut TcpStream, buf: &mut Vec<u8>) -> Option<String> 
     loop {
         match stream.read(&mut byte).await {
             Ok(1) => {
-                if byte[0] == b'\n' { break; }
+                if byte[0] == b'\n' {
+                    break;
+                }
                 buf.push(byte[0]);
             }
             _ => return None,

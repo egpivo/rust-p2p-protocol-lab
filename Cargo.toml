@@ -9,10 +9,11 @@ members = [
   "crates/port-scanner",
   "crates/tcp-proxy",
   "crates/ids",
-  "crates/honeypot", 
+  "crates/honeypot",
   "crates/brute-forcer",
   "crates/p2p-core",
   "crates/p2p-node",
-  "crates/p2p-lab", "crates/p2p-env",
+  "crates/p2p-lab",
+  "crates/p2p-env",
 ]
 resolver = "2"

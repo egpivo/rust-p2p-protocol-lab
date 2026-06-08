@@ -1,27 +1,27 @@
-use tokio::net::{TcpListener, TcpStream};
-use tokio::io::{AsyncReadExt, AsyncWriteExt, AsyncRead, AsyncWrite};
 use framed_core::{MAX_PAYLOAD, encode_frame};
+use rustls::ServerConfig;
+use sha2::{Digest, Sha256};
+use std::fs;
+use std::io::{Error, ErrorKind, Result};
+use std::net::SocketAddr;
 use std::str::from_utf8;
+use std::sync::Arc;
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::net::TcpListener;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::error::RecvError;
-use std::net::SocketAddr;
-use std::io::{Result, Error, ErrorKind};
-use rustls::ServerConfig;
-use std::sync::Arc;
 use tokio_rustls::TlsAcceptor;
-use sha2::{Sha256, Digest};
-use std::fs;
 
-async fn read_frames<S>(stream: &mut S) -> Result<(Vec<u8>)> 
+async fn read_frames<S>(stream: &mut S) -> Result<Vec<u8>>
 where
-    S: AsyncRead + AsyncWrite+ Unpin,
+    S: AsyncRead + AsyncWrite + Unpin,
 {
     let mut len_buf = [0u8; 4];
     stream.read_exact(&mut len_buf).await?;
     let payload_len = u32::from_be_bytes(len_buf);
     if payload_len > MAX_PAYLOAD {
         return Err(Error::new(
-             ErrorKind::InvalidData,
+            ErrorKind::InvalidData,
             format!("frame too large: {payload_len} bytes (max {MAX_PAYLOAD})"),
         ));
     }
@@ -37,16 +37,14 @@ fn make_tls_acceptor() -> TlsAcceptor {
     let hash_hex = hex::encode(hash);
     fs::write("cert.hash", &hash_hex).unwrap();
     println!("cert hash: {hash_hex}");
-    let key_der = rustls::pki_types::PrivateKeyDer::try_from(
-        cert.key_pair.serialize_der()
-    ).unwrap();
+    let key_der =
+        rustls::pki_types::PrivateKeyDer::try_from(cert.key_pair.serialize_der()).unwrap();
     let config = ServerConfig::builder()
         .with_no_client_auth()
         .with_single_cert(vec![cert_der], key_der)
         .unwrap();
     TlsAcceptor::from(Arc::new(config))
 }
-
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
@@ -57,7 +55,7 @@ async fn main() -> std::io::Result<()> {
 
     let acceptor = make_tls_acceptor();
     loop {
-        let (mut stream, client_addr) = listener.accept().await?;
+        let (stream, client_addr) = listener.accept().await?;
         let mut stream = acceptor.accept(stream).await?;
         println!("client connected: {client_addr}");
 
@@ -70,7 +68,7 @@ async fn main() -> std::io::Result<()> {
                     body = read_frames(&mut stream) => {
                         let body = match body {
                             Ok(b) => b,
-                            Err(e) => {
+                            Err(_e) => {
                                 eprintln!("failed to read frame from {client_addr}");
                                 break;
                             }
@@ -112,6 +110,5 @@ async fn main() -> std::io::Result<()> {
                 }
             }
         });
-
     }
 }

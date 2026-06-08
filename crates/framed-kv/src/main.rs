@@ -1,10 +1,9 @@
-use tokio::net::TcpListener;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use framed_core::{MAX_PAYLOAD, encode_frame};
-use std::str::from_utf8;
 use std::collections::HashMap;
+use std::str::from_utf8;
 use std::sync::{Arc, Mutex};
-
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpListener;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
@@ -14,7 +13,6 @@ async fn main() -> std::io::Result<()> {
     let store = Arc::new(Mutex::new(HashMap::<String, String>::new()));
 
     loop {
-
         let (mut stream, client_addr) = listener.accept().await?;
         println!("client connected: {client_addr}");
         let store = store.clone();
@@ -37,10 +35,8 @@ async fn main() -> std::io::Result<()> {
                     return;
                 }
                 println!("from {client_addr}: {payload_len} bytes");
-                let cmd = from_utf8(&body)
-                    .ok()
-                    .map(str::trim);
-    
+                let cmd = from_utf8(&body).ok().map(str::trim);
+
                 let Some(text) = cmd else {
                     eprintln!("invalid utf-8 from {client_addr}");
                     continue;
@@ -57,7 +53,10 @@ async fn main() -> std::io::Result<()> {
                         }
                     }
                     ["PUT", key, value] => {
-                        store.lock().unwrap().insert(key.to_string(), value.to_string());
+                        store
+                            .lock()
+                            .unwrap()
+                            .insert(key.to_string(), value.to_string());
                         b"OK".to_vec()
                     }
                     other => {

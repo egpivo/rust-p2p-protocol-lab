@@ -1,8 +1,8 @@
+use std::net::SocketAddr;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::error::RecvError;
-use std::net::SocketAddr;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {

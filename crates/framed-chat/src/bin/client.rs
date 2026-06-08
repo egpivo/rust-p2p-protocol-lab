@@ -1,15 +1,14 @@
-use tokio::io::{AsyncRead,AsyncWrite, AsyncReadExt,AsyncWriteExt, BufReader, AsyncBufReadExt};
-use tokio::net::TcpStream;
 use framed_core::{MAX_PAYLOAD, encode_frame};
-use std::io::{Result, Error, ErrorKind};
 use rustls::ClientConfig;
-use rustls::client::danger::{ServerCertVerifier, HandshakeSignatureValid, ServerCertVerified};
-use rustls::pki_types::{ServerName, CertificateDer, UnixTime};
 use rustls::DigitallySignedStruct;
-use tokio_rustls::TlsConnector;
+use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
+use rustls::pki_types::{CertificateDer, ServerName, UnixTime};
+use sha2::{Digest, Sha256};
+use std::io::{Error, ErrorKind, Result};
 use std::sync::Arc;
-use sha2::{Sha256, Digest};
-
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::net::TcpStream;
+use tokio_rustls::TlsConnector;
 
 #[derive(Debug)]
 struct PinnedVerifier {
@@ -17,7 +16,14 @@ struct PinnedVerifier {
 }
 
 impl ServerCertVerifier for PinnedVerifier {
-    fn verify_server_cert(&self, end_entity: &CertificateDer, _: &[CertificateDer], _: &ServerName, _: &[u8], _: UnixTime) -> std::result::Result<ServerCertVerified, rustls::Error> {
+    fn verify_server_cert(
+        &self,
+        end_entity: &CertificateDer,
+        _: &[CertificateDer],
+        _: &ServerName,
+        _: &[u8],
+        _: UnixTime,
+    ) -> std::result::Result<ServerCertVerified, rustls::Error> {
         let hash = Sha256::digest(end_entity.as_ref());
         if hash.as_slice() == self.expected_hash.as_slice() {
             Ok(ServerCertVerified::assertion())
@@ -26,16 +32,28 @@ impl ServerCertVerifier for PinnedVerifier {
         }
     }
 
-    fn verify_tls12_signature(&self, _: &[u8], _: &CertificateDer, _: &DigitallySignedStruct) -> std::result::Result<HandshakeSignatureValid, rustls::Error> {
+    fn verify_tls12_signature(
+        &self,
+        _: &[u8],
+        _: &CertificateDer,
+        _: &DigitallySignedStruct,
+    ) -> std::result::Result<HandshakeSignatureValid, rustls::Error> {
         Ok(HandshakeSignatureValid::assertion())
     }
 
-    fn verify_tls13_signature(&self, _: &[u8], _: &CertificateDer, _: &DigitallySignedStruct) -> std::result::Result<HandshakeSignatureValid, rustls::Error> {
+    fn verify_tls13_signature(
+        &self,
+        _: &[u8],
+        _: &CertificateDer,
+        _: &DigitallySignedStruct,
+    ) -> std::result::Result<HandshakeSignatureValid, rustls::Error> {
         Ok(HandshakeSignatureValid::assertion())
     }
 
     fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
-        rustls::crypto::aws_lc_rs::default_provider().signature_verification_algorithms.supported_schemes()
+        rustls::crypto::aws_lc_rs::default_provider()
+            .signature_verification_algorithms
+            .supported_schemes()
     }
 }
 
@@ -47,7 +65,7 @@ fn make_tls_connector(expected_hash: Vec<u8>) -> TlsConnector {
     TlsConnector::from(Arc::new(config))
 }
 
-async fn read_frames<S>(stream: &mut S) -> Result<(Vec<u8>)> 
+async fn read_frames<S>(stream: &mut S) -> Result<Vec<u8>>
 where
     S: AsyncRead + Unpin,
 {
@@ -56,7 +74,7 @@ where
     let payload_len = u32::from_be_bytes(len_buf);
     if payload_len > MAX_PAYLOAD {
         return Err(Error::new(
-             ErrorKind::InvalidData,
+            ErrorKind::InvalidData,
             format!("frame too large: {payload_len} bytes (max {MAX_PAYLOAD})"),
         ));
     }
@@ -64,7 +82,6 @@ where
     stream.read_exact(&mut body).await?;
     Ok(body)
 }
-
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
@@ -84,7 +101,9 @@ async fn main() -> std::io::Result<()> {
     let resp = read_frames(&mut stream).await?;
     println!("JOIN: {}", String::from_utf8_lossy(&resp));
     if let Some(msg) = message {
-        stream.write_all(&encode_frame(format!("SAY {msg}").as_bytes())).await?;
+        stream
+            .write_all(&encode_frame(format!("SAY {msg}").as_bytes()))
+            .await?;
         let resp = read_frames(&mut stream).await?;
         println!("SAY: {}", String::from_utf8_lossy(&resp));
         return Ok(());
@@ -94,11 +113,11 @@ async fn main() -> std::io::Result<()> {
     let mut lines = BufReader::new(stdin).lines();
 
     loop {
-        tokio::select!{
+        tokio::select! {
             body = read_frames(&mut stream) =>{
                 let body = match body {
                     Ok(b) => b,
-                    Err(e) => {
+                    Err(_e) => {
                         eprintln!("failed to read frame from server");
                         break Ok(());
                     }
@@ -115,5 +134,4 @@ async fn main() -> std::io::Result<()> {
             }
         }
     }
-
 }

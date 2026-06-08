@@ -1,7 +1,7 @@
-use tokio::net::{TcpListener, TcpStream};
+use std::env;
 use tokio::io;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use std::env;
+use tokio::net::{TcpListener, TcpStream};
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
@@ -27,8 +27,8 @@ async fn main() -> io::Result<()> {
     }
 }
 
-async fn handle(mut client: TcpStream, target: String) -> io::Result<()> {
-    let mut server = TcpStream::connect(&target).await?;
+async fn handle(client: TcpStream, target: String) -> io::Result<()> {
+    let server = TcpStream::connect(&target).await?;
     println!("connected to {target}");
 
     let (mut cr, mut cw) = client.into_split();
@@ -38,7 +38,9 @@ async fn handle(mut client: TcpStream, target: String) -> io::Result<()> {
         let mut buf = vec![0u8; 4096];
         loop {
             let n = cr.read(&mut buf).await?;
-            if n == 0 { break; }
+            if n == 0 {
+                break;
+            }
             println!("→ server: {:?}", String::from_utf8_lossy(&buf[..n]));
 
             let data = String::from_utf8_lossy(&buf[..n]);
@@ -48,12 +50,14 @@ async fn handle(mut client: TcpStream, target: String) -> io::Result<()> {
         }
         Ok::<_, io::Error>(())
     });
-    
+
     let s2c = tokio::spawn(async move {
         let mut buf = vec![0u8; 4096];
         loop {
             let n = sr.read(&mut buf).await?;
-            if n == 0 { break; }
+            if n == 0 {
+                break;
+            }
             println!("← client: {:?}", String::from_utf8_lossy(&buf[..n]));
             cw.write_all(&buf[..n]).await?;
         }
@@ -62,4 +66,3 @@ async fn handle(mut client: TcpStream, target: String) -> io::Result<()> {
     let _ = tokio::join!(c2s, s2c);
     Ok(())
 }
-

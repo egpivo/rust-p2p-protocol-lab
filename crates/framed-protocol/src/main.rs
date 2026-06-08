@@ -1,10 +1,9 @@
-use tokio::net::TcpListener;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use framed_core::{MAX_PAYLOAD, encode_frame};
-
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpListener;
 
 #[tokio::main]
-async fn main() -> std::io::Result<()>{
+async fn main() -> std::io::Result<()> {
     let addr = "127.0.0.1:7002";
     let listener = TcpListener::bind(addr).await?;
     println!("Listening on {addr}");

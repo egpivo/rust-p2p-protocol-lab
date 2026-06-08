@@ -1,13 +1,13 @@
-use tokio::net::TcpStream;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::task::JoinSet;
-use tokio::sync::Semaphore;
-use tokio::fs;
 use std::sync::Arc;
+use tokio::fs;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
+use tokio::sync::Semaphore;
+use tokio::task::JoinSet;
 
 #[tokio::main]
 async fn main() {
-    let content = fs::read_to_string("wordlist.txt").await.unwrap();
+    let content = fs::read_to_string("artifacts/wordlist.txt").await.unwrap();
     let credentials: Vec<(String, String)> = content
         .lines()
         .filter_map(|line| {
@@ -37,7 +37,10 @@ async fn main() {
     }
 
     let result = try_login("127.0.0.1:2222", "root", "123456").await;
-    println!("root/123456 → {}", if result { "SUCCESS" } else { "failed" });
+    println!(
+        "root/123456 → {}",
+        if result { "SUCCESS" } else { "failed" }
+    );
 }
 
 async fn try_login(addr: &str, user: &str, pass: &str) -> bool {
@@ -49,7 +52,7 @@ async fn try_login(addr: &str, user: &str, pass: &str) -> bool {
     let mut buf = vec![0u8; 256];
 
     // read banner
-    let n = match stream.read(&mut buf).await {
+    let _n = match stream.read(&mut buf).await {
         Ok(n) if n > 0 => n,
         _ => return false,
     };
@@ -58,7 +61,7 @@ async fn try_login(addr: &str, user: &str, pass: &str) -> bool {
     let _ = stream.write_all(format!("{}\n", user).as_bytes()).await;
 
     // read "Password: " prompt
-    let n = match stream.read(&mut buf).await {
+    let _n = match stream.read(&mut buf).await {
         Ok(n) if n > 0 => n,
         _ => return false,
     };
@@ -73,7 +76,9 @@ async fn try_login(addr: &str, user: &str, pass: &str) -> bool {
             Ok(n) => n,
         };
         response.push_str(&String::from_utf8_lossy(&buf[..n]));
-        if response.contains('\n') { break; }
+        if response.contains('\n') {
+            break;
+        }
     }
     !response.contains("Authentication failed")
 }

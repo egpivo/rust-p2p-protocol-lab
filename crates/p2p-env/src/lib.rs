@@ -1,12 +1,11 @@
-use std::collections::HashMap;
 use p2p_core::{Message, NodeId};
+use p2p_node::{MAX_PEERS, PeerList, handle_inbound};
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
-use tokio::net::{TcpListener, TcpStream};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
-use p2p_node::{handle_inbound, PeerList, MAX_PEERS};
-
+use tokio::net::{TcpListener, TcpStream};
 
 pub struct EnvConfig {
     pub honest_nodes: usize,
@@ -41,11 +40,13 @@ pub struct NetworkEnv {
 
 impl NetworkEnv {
     pub fn new(config: EnvConfig) -> Self {
-        Self { config, nodes: Vec::new() }
+        Self {
+            config,
+            nodes: Vec::new(),
+        }
     }
 
     pub async fn reset(&mut self) {
-        
         // kill old tasks
         for node in self.nodes.drain(..) {
             node.task.abort();
@@ -55,17 +56,22 @@ impl NetworkEnv {
         let seed = format!("127.0.0.1:{}", self.config.base_port)
             .parse()
             .unwrap();
-        
+
         for i in 0..self.config.honest_nodes {
             let port = self.config.base_port + i as u16;
             let seeds = if i == 0 { vec![] } else { vec![seed] };
             let (task, blocklist) = spawn_node(port, seeds).await;
             let addr = format!("127.0.0.1:{port}").parse().unwrap();
-            self.nodes.push(NodeHandle { port, addr, blocklist, task});
+            self.nodes.push(NodeHandle {
+                port,
+                addr,
+                blocklist,
+                task,
+            });
         }
     }
 
-    pub async fn run(&self, attack: &dyn Attack) -> AttackResult {
+    pub async fn run(&self, _attack: &dyn Attack) -> AttackResult {
         todo!()
     }
 }
@@ -77,7 +83,10 @@ pub struct NodeHandle {
     task: tokio::task::JoinHandle<()>,
 }
 
-pub async fn spawn_node(port: u16, seeds: Vec<SocketAddr>) -> (tokio::task::JoinHandle<()>, p2p_node::BlockList) {
+pub async fn spawn_node(
+    port: u16,
+    seeds: Vec<SocketAddr>,
+) -> (tokio::task::JoinHandle<()>, p2p_node::BlockList) {
     let blocklist: p2p_node::BlockList = Arc::new(Mutex::new(std::collections::HashSet::new()));
     let blocklist_inner = blocklist.clone();
 
@@ -90,23 +99,30 @@ pub async fn spawn_node(port: u16, seeds: Vec<SocketAddr>) -> (tokio::task::Join
         // connect to seeds
         for seed in seeds {
             let peers = peers.clone();
-            tokio::spawn(async move{
-                let Ok(mut stream) = TcpStream::connect(seed).await else { return };
+            tokio::spawn(async move {
+                let Ok(mut stream) = TcpStream::connect(seed).await else {
+                    return;
+                };
 
-                let known =  peers.lock().unwrap().clone();
+                let known = peers.lock().unwrap().clone();
                 let mut msg = serde_json::to_string(&Message::Hello {
                     node_id,
                     listen_addr: format!("127.0.0.1:{port}").parse().unwrap(),
                     peers: known,
-                }).unwrap();
+                })
+                .unwrap();
                 msg.push('\n');
-                if stream.write_all(msg.as_bytes()).await.is_err() { return; }
+                if stream.write_all(msg.as_bytes()).await.is_err() {
+                    return;
+                }
 
                 let (read_half, mut write_half) = stream.into_split();
                 let mut reader = BufReader::new(read_half);
                 let mut line = String::new();
 
-                if reader.read_line(&mut line).await.unwrap_or(0) == 0 { return; }
+                if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
+                    return;
+                }
                 if let Ok(Message::Hello { .. }) = serde_json::from_str(line.trim()) {
                     peers.lock().unwrap().push(seed);
                 }
@@ -117,16 +133,24 @@ pub async fn spawn_node(port: u16, seeds: Vec<SocketAddr>) -> (tokio::task::Join
                     tick += 1;
                     let mut ping = serde_json::to_string(&Message::Ping).unwrap();
                     ping.push('\n');
-                    if write_half.write_all(ping.as_bytes()).await.is_err() { break; }
+                    if write_half.write_all(ping.as_bytes()).await.is_err() {
+                        break;
+                    }
                     line.clear();
-                    if reader.read_line(&mut line).await.unwrap_or(0) == 0 { break; }
+                    if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
+                        break;
+                    }
 
-                    if tick % 2 == 0 {
+                    if tick.is_multiple_of(2) {
                         line.clear();
                         let mut get = serde_json::to_string(&Message::GetPeers).unwrap();
                         get.push('\n');
-                        if write_half.write_all(get.as_bytes()).await.is_err() { break; }
-                        if reader.read_line(&mut line).await.unwrap_or(0) == 0 { break; }
+                        if write_half.write_all(get.as_bytes()).await.is_err() {
+                            break;
+                        }
+                        if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
+                            break;
+                        }
                         if let Ok(Message::Peers(list)) = serde_json::from_str(line.trim()) {
                             let mut p = peers.lock().unwrap();
                             for addr in list {
@@ -154,7 +178,7 @@ pub async fn spawn_node(port: u16, seeds: Vec<SocketAddr>) -> (tokio::task::Join
 
 pub struct SybilAttack {
     pub target_index: usize,
-    pub count: usize
+    pub count: usize,
 }
 
 impl SybilAttack {
@@ -165,7 +189,11 @@ impl SybilAttack {
         // spawn Sybil nodes
         for i in 0..count {
             tokio::spawn(async move {
-                let Some((_reader, _writer)) = connect_as_sybil(target_addr, 19000 + i as u16).await else { return };
+                let Some((_reader, _writer)) =
+                    connect_as_sybil(target_addr, 19000 + i as u16).await
+                else {
+                    return;
+                };
                 tokio::time::sleep(tokio::time::Duration::from_secs(3600)).await;
             });
         }
@@ -177,7 +205,7 @@ impl SybilAttack {
         let peers: Vec<SocketAddr> = query_peers(target_addr).await.unwrap_or_default();
         let sybil_count = peers.iter().filter(|a| a.port() >= 19000).count();
         let occupancy = sybil_count as f64 / peers.len().max(1) as f64 * 100.0;
-        
+
         let mut metrics = HashMap::new();
         metrics.insert("occupancy".to_string(), occupancy);
         metrics.insert("total_peers".to_string(), peers.len() as f64);
@@ -186,19 +214,19 @@ impl SybilAttack {
         AttackResult {
             success: occupancy >= 100.0,
             metrics,
-            summary: format!("Sybil occupancy: {occupancy:.0}% ({sybil_count}/{} peers)", peers.len()),
+            summary: format!(
+                "Sybil occupancy: {occupancy:.0}% ({sybil_count}/{} peers)",
+                peers.len()
+            ),
         }
     }
-
-
-
-
 }
 
 impl Attack for SybilAttack {
-    fn name(&self) -> &str { "Sybil" }
+    fn name(&self) -> &str {
+        "Sybil"
+    }
 }
-
 
 async fn query_peers(addr: SocketAddr) -> Option<Vec<SocketAddr>> {
     let mut stream = TcpStream::connect(addr).await.ok()?;
@@ -207,7 +235,8 @@ async fn query_peers(addr: SocketAddr) -> Option<Vec<SocketAddr>> {
         node_id,
         listen_addr: "127.0.0.1:0".parse().unwrap(),
         peers: vec![],
-    }).unwrap();
+    })
+    .unwrap();
     line.push('\n');
     stream.write_all(line.as_bytes()).await.ok()?;
 
@@ -227,14 +256,20 @@ async fn query_peers(addr: SocketAddr) -> Option<Vec<SocketAddr>> {
     }
 }
 
-async fn connect_as_sybil(target: SocketAddr, port: u16) -> Option<(BufReader<OwnedReadHalf>, OwnedWriteHalf)> {
+async fn connect_as_sybil(
+    target: SocketAddr,
+    port: u16,
+) -> Option<(BufReader<OwnedReadHalf>, OwnedWriteHalf)> {
     let node_id = NodeId::random();
-    let Ok(mut stream) = TcpStream::connect(target).await else { return None };
+    let Ok(mut stream) = TcpStream::connect(target).await else {
+        return None;
+    };
     let mut msg = serde_json::to_string(&Message::Hello {
         node_id,
         listen_addr: format!("127.0.0.1:{port}").parse().unwrap(),
         peers: vec![],
-    }).unwrap();
+    })
+    .unwrap();
     msg.push('\n');
     stream.write_all(msg.as_bytes()).await.ok()?;
 
@@ -258,11 +293,16 @@ impl EclipseAttack {
 
         for i in 0..count {
             tokio::spawn(async move {
-                let Some((_reader, mut write_half)) = connect_as_sybil(target_addr, 19000 + i as u16).await else { return };
+                let Some((_reader, mut write_half)) =
+                    connect_as_sybil(target_addr, 19000 + i as u16).await
+                else {
+                    return;
+                };
                 let mut tip = serde_json::to_string(&Message::Tip {
                     height: 9999,
                     hash: "attacker_tip_FAKE".to_string(),
-                }).unwrap();
+                })
+                .unwrap();
                 tip.push('\n');
                 write_half.write_all(tip.as_bytes()).await.ok();
 
@@ -281,7 +321,10 @@ impl EclipseAttack {
         metrics.insert("occupancy".to_string(), occupancy);
         metrics.insert("sybil_peers".to_string(), sybil as f64);
         metrics.insert("honest_peers".to_string(), (peers.len() - sybil) as f64);
-        metrics.insert("state_diverged".to_string(), if diverged { 1.0 } else { 0.0 });
+        metrics.insert(
+            "state_diverged".to_string(),
+            if diverged { 1.0 } else { 0.0 },
+        );
 
         AttackResult {
             success: diverged,
@@ -295,7 +338,9 @@ impl EclipseAttack {
 }
 
 impl Attack for EclipseAttack {
-    fn name(&self) -> &str { "Eclipse" }
+    fn name(&self) -> &str {
+        "Eclipse"
+    }
 }
 
 pub struct NetworkPartitionAttack {
@@ -334,13 +379,14 @@ impl NetworkPartitionAttack {
 
         // verify: query group_a node, check if group_b addrs still appear
         let a_peers: Vec<SocketAddr> = query_peers(addrs_a[0]).await.unwrap_or_default();
-        let cross_peers = a_peers.iter()
+        let cross_peers = a_peers
+            .iter()
             .filter(|p| addrs_b.iter().any(|b| b.port() == p.port()))
             .count();
-        
+
         metrics.insert("cross_peers_remaining".to_string(), cross_peers as f64);
         let partitioned = cross_peers == 0;
-        
+
         AttackResult {
             success: partitioned,
             metrics,
@@ -349,10 +395,11 @@ impl NetworkPartitionAttack {
                 self.group_a, self.group_b,
             ),
         }
-
     }
 }
 
 impl Attack for NetworkPartitionAttack {
-    fn name(&self) -> &str { "NetworkPartition" } 
+    fn name(&self) -> &str {
+        "NetworkPartition"
+    }
 }

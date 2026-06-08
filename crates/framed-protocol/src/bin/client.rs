@@ -1,6 +1,6 @@
-use tokio::io::{AsyncReadExt,AsyncWriteExt};
-use tokio::net::TcpStream;
 use framed_core::{MAX_PAYLOAD, encode_frame};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {

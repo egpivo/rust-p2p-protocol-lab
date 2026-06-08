@@ -1,13 +1,12 @@
+use ipnet::IpNet;
 use std::net::IpAddr;
 use std::str::FromStr;
-use std::time::Duration;
-use tokio::net::TcpStream;
-use tokio::task::JoinSet;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use ipnet::IpNet;
 use std::sync::Arc;
+use std::time::Duration;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
 use tokio::sync::Semaphore;
-
+use tokio::task::JoinSet;
 
 #[tokio::main]
 async fn main() {
@@ -36,20 +35,25 @@ async fn main() {
                 let result = tokio::time::timeout(
                     Duration::from_millis(500),
                     TcpStream::connect((ip, port)),
-                ).await;
+                )
+                .await;
                 match result {
                     Ok(Ok(mut stream)) => {
                         let mut buf = vec![0u8; 256];
                         let mut banner = match tokio::time::timeout(
                             Duration::from_millis(500),
                             stream.read(&mut buf),
-                        ).await {
-                            Ok(Ok(n)) if n > 0 => Some(String::from_utf8_lossy(&buf[..n])
-                            .lines()
-                            .next()
-                            .unwrap_or("")
-                            .trim()
-                            .to_string()),
+                        )
+                        .await
+                        {
+                            Ok(Ok(n)) if n > 0 => Some(
+                                String::from_utf8_lossy(&buf[..n])
+                                    .lines()
+                                    .next()
+                                    .unwrap_or("")
+                                    .trim()
+                                    .to_string(),
+                            ),
                             _ => None,
                         };
                         if banner.is_none() {
@@ -59,13 +63,17 @@ async fn main() {
                                 banner = match tokio::time::timeout(
                                     Duration::from_millis(500),
                                     stream.read(&mut buf2),
-                                ).await {
-                                    Ok(Ok(n)) if n > 0 => Some(String::from_utf8_lossy(&buf2[..n])
-                                    .lines()
-                                    .next()
-                                    .unwrap_or("")
-                                    .trim()
-                                    .to_string()),
+                                )
+                                .await
+                                {
+                                    Ok(Ok(n)) if n > 0 => Some(
+                                        String::from_utf8_lossy(&buf2[..n])
+                                            .lines()
+                                            .next()
+                                            .unwrap_or("")
+                                            .trim()
+                                            .to_string(),
+                                    ),
                                     _ => None,
                                 };
                             }
@@ -76,7 +84,7 @@ async fn main() {
                 }
             });
         }
-        while  let Some(res) = set.join_next().await {
+        while let Some(res) = set.join_next().await {
             if let Ok((port, true, banner)) = res {
                 match banner {
                     Some(b) => println!("{port}/tcp open {b}"),
