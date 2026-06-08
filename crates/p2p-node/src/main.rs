@@ -99,6 +99,18 @@ async fn main() {
             }
         }
     });
+
+    let peers_for_tip = peers.clone();
+    tokio::spawn(async move {
+        let mut height = 100u64;
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+            let known = peers_for_tip.lock().unwrap().clone();
+            println!("[{port}] broadcasting tip height={height}");
+            // tip broadcast happens via direct connection - skip for now
+            height += 1;
+        }
+    });
     tokio::signal::ctrl_c().await.unwrap();
 }
 
@@ -163,6 +175,9 @@ async fn handle_inbound(
                 let mut msg = serde_json::to_string(&Message::Peers(known)).unwrap();
                 msg.push('\n');
                 if write_half.write_all(msg.as_bytes()).await.is_err() { break; }
+            }
+            Ok(Message::Tip { height, hash }) => {
+                println!("[{}] tip: height={} hash={}", node_id.0, height, hash);
             }
             _ => {}
         }
