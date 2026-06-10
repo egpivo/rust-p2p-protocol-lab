@@ -1,14 +1,11 @@
 [package]
-name = "p2p-node"
+name = "p2p-noise"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
+snow = "0.9"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 p2p-core = { path = "../p2p-core" }
-tokio-rustls = "0.26"
-rustls = "0.23"
-rcgen = "0.13"
-snow = "0.9"
