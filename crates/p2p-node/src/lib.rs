@@ -3,32 +3,38 @@ use std::collections::HashSet;
 use std::net::IpAddr;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::net::TcpStream;
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
+use tokio_rustls::rustls::ServerConfig;
+use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer};
 
 pub type PeerList = Arc<Mutex<Vec<SocketAddr>>>;
 pub type BlockList = Arc<Mutex<HashSet<IpAddr>>>;
 pub const MAX_PEERS: usize = 8;
 
-pub async fn send_msg(stream: &mut TcpStream, msg: &Message) -> std::io::Result<()> {
+pub async fn send_msg<W>(writer: &mut W, msg: &Message) -> std::io::Result<()>
+where
+    W: AsyncWriteExt + Unpin,
+{
     let mut line = serde_json::to_string(msg).unwrap();
     line.push('\n');
-    stream.write_all(line.as_bytes()).await
+    writer.write_all(line.as_bytes()).await
 }
 
-pub async fn handle_inbound(
-    stream: TcpStream,
+pub async fn handle_inbound<S>(
+    stream: S,
     peer_addr: SocketAddr,
     node_id: NodeId,
     port: u16,
     peers: PeerList,
     blocklist: BlockList,
-) {
+) where
+    S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+{
     if blocklist.lock().unwrap().contains(&peer_addr.ip()) {
         return;
     }
     // receive their Hello first
-    let (read_half, mut write_half) = stream.into_split();
+    let (read_half, mut write_half) = tokio::io::split(stream);
     let mut reader = BufReader::new(read_half);
     let mut line = String::new();
 
@@ -104,4 +110,18 @@ pub async fn handle_inbound(
     }
 
     println!("[{}] connection closed from {}", node_id.0, peer_addr);
+}
+
+pub fn make_tls_config() -> (ServerConfig, CertificateDer<'static>, Vec<u8>) {
+    let cert = rcgen::generate_simple_self_signed(vec!["localhost".to_string()]).unwrap();
+    let cert_der = CertificateDer::from(cert.cert.der().to_vec());
+    let key_der = PrivateKeyDer::try_from(cert.key_pair.serialize_der()).unwrap();
+
+    let server_config = ServerConfig::builder()
+        .with_no_client_auth()
+        .with_single_cert(vec![cert_der.clone()], key_der)
+        .unwrap();
+
+    let cert_bytes = cert_der.to_vec();
+    (server_config, cert_der, cert_bytes)
 }
