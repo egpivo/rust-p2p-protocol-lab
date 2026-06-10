@@ -4,6 +4,55 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
+use tokio_rustls::rustls::client::danger::HandshakeSignatureValid;
+use tokio_rustls::rustls::client::danger::{ServerCertVerified, ServerCertVerifier};
+use tokio_rustls::rustls::pki_types::{CertificateDer, ServerName, UnixTime};
+use tokio_rustls::rustls::{
+    ClientConfig, DigitallySignedStruct, Error as TlsError, SignatureScheme,
+};
+use tokio_rustls::{TlsAcceptor, TlsConnector};
+
+#[derive(Debug)]
+struct NoVerifier;
+
+impl ServerCertVerifier for NoVerifier {
+    fn verify_server_cert(
+        &self,
+        _end_entity: &CertificateDer,
+        _intermediates: &[CertificateDer],
+        _server_name: &ServerName,
+        _ocsp: &[u8],
+        _now: UnixTime,
+    ) -> Result<ServerCertVerified, TlsError> {
+        Ok(ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        _: &[u8],
+        _: &CertificateDer,
+        _: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, TlsError> {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        _: &[u8],
+        _: &CertificateDer,
+        _: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, TlsError> {
+        Ok(HandshakeSignatureValid::assertion())
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        vec![
+            SignatureScheme::ED25519,
+            SignatureScheme::ECDSA_NISTP256_SHA256,
+            SignatureScheme::RSA_PSS_SHA256,
+        ]
+    }
+}
 
 #[tokio::main]
 async fn main() {
@@ -19,17 +68,36 @@ async fn main() {
     println!("[{port}] NodeId={:?}", node_id);
     let listen_addr = format!("127.0.0.1:{port}");
     let listener = TcpListener::bind(&listen_addr).await.unwrap();
+    let (server_config, _cert_der, _cert_bytes) = p2p_node::make_tls_config();
+    let tls_acceptor = TlsAcceptor::from(Arc::new(server_config));
+    let client_config = ClientConfig::builder()
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(NoVerifier))
+        .with_no_client_auth();
+    let tls_connector = TlsConnector::from(Arc::new(client_config));
     println!("[{port}] listening");
 
     // connect to seed peers
     for seed in seeds {
         let peers = peers.clone();
+        let tls_connector = tls_connector.clone();
         tokio::spawn(async move {
             match TcpStream::connect(seed).await {
-                Ok(mut stream) => {
+                Ok(tcp_stream) => {
+                    let server_name = ServerName::try_from("localhost").unwrap();
+                    let tls_stream = tls_connector
+                        .connect(server_name, tcp_stream)
+                        .await
+                        .unwrap();
+
+                    // split stream so we can read and write separately
+                    let (read_half, mut write_half) = tokio::io::split(tls_stream);
+                    let mut reader = BufReader::new(read_half);
+                    let mut line = String::new();
+
                     let known = peers.lock().unwrap().clone();
                     send_msg(
-                        &mut stream,
+                        &mut write_half,
                         &Message::Hello {
                             node_id,
                             listen_addr: format!("127.0.0.1:{port}").parse().unwrap(),
@@ -38,11 +106,6 @@ async fn main() {
                     )
                     .await
                     .ok();
-
-                    // split stream so we can read and write separately
-                    let (read_half, mut write_half) = stream.into_split();
-                    let mut reader = BufReader::new(read_half);
-                    let mut line = String::new();
 
                     // read their Hello reply
                     if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
@@ -104,18 +167,20 @@ async fn main() {
     let peers_clone = peers.clone();
     tokio::spawn(async move {
         loop {
-            if let Ok((stream, peer_addr)) = listener.accept().await {
+            if let Ok((tcp_stream, peer_addr)) = listener.accept().await {
+                let acceptor = tls_acceptor.clone();
                 let peers = peers_clone.clone();
                 let blocklist: p2p_node::BlockList =
                     Arc::new(Mutex::new(std::collections::HashSet::new()));
-                tokio::spawn(handle_inbound(
-                    stream,
-                    peer_addr,
-                    node_id,
-                    port,
-                    peers,
-                    blocklist.clone(),
-                ));
+                let bl = blocklist.clone();
+                tokio::spawn(async move {
+                    match acceptor.accept(tcp_stream).await {
+                        Ok(tls_stream) => {
+                            handle_inbound(tls_stream, peer_addr, node_id, port, peers, bl).await;
+                        }
+                        Err(e) => eprintln!("[{port}] TLS accept failed: {e}"),
+                    }
+                });
             }
         }
     });
