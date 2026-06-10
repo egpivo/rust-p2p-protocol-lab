@@ -442,8 +442,12 @@ name = "p2p-lab"
 version = "0.1.0"
 dependencies = [
  "p2p-core",
+ "p2p-node",
+ "rcgen",
+ "rustls",
  "serde_json",
  "tokio",
+ "tokio-rustls",
 ]
 
 [[package]]
@@ -581,6 +585,7 @@ dependencies = [
  "aws-lc-rs",
  "log",
  "once_cell",
+ "ring",
  "rustls-pki-types",
  "rustls-webpki",
  "subtle",

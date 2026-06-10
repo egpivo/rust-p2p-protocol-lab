@@ -1,58 +1,12 @@
 use p2p_core::{Message, NodeId};
-use p2p_node::{MAX_PEERS, PeerList, handle_inbound, send_msg};
+use p2p_node::{MAX_PEERS, NoVerifier, PeerList, handle_inbound, send_msg};
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
-use tokio_rustls::rustls::client::danger::HandshakeSignatureValid;
-use tokio_rustls::rustls::client::danger::{ServerCertVerified, ServerCertVerifier};
-use tokio_rustls::rustls::pki_types::{CertificateDer, ServerName, UnixTime};
-use tokio_rustls::rustls::{
-    ClientConfig, DigitallySignedStruct, Error as TlsError, SignatureScheme,
-};
+use tokio_rustls::rustls::ClientConfig;
+use tokio_rustls::rustls::pki_types::ServerName;
 use tokio_rustls::{TlsAcceptor, TlsConnector};
-
-#[derive(Debug)]
-struct NoVerifier;
-
-impl ServerCertVerifier for NoVerifier {
-    fn verify_server_cert(
-        &self,
-        _end_entity: &CertificateDer,
-        _intermediates: &[CertificateDer],
-        _server_name: &ServerName,
-        _ocsp: &[u8],
-        _now: UnixTime,
-    ) -> Result<ServerCertVerified, TlsError> {
-        Ok(ServerCertVerified::assertion())
-    }
-
-    fn verify_tls12_signature(
-        &self,
-        _: &[u8],
-        _: &CertificateDer,
-        _: &DigitallySignedStruct,
-    ) -> Result<HandshakeSignatureValid, TlsError> {
-        Ok(HandshakeSignatureValid::assertion())
-    }
-
-    fn verify_tls13_signature(
-        &self,
-        _: &[u8],
-        _: &CertificateDer,
-        _: &DigitallySignedStruct,
-    ) -> Result<HandshakeSignatureValid, TlsError> {
-        Ok(HandshakeSignatureValid::assertion())
-    }
-
-    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
-        vec![
-            SignatureScheme::ED25519,
-            SignatureScheme::ECDSA_NISTP256_SHA256,
-            SignatureScheme::RSA_PSS_SHA256,
-        ]
-    }
-}
 
 #[tokio::main]
 async fn main() {

