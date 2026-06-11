@@ -14,6 +14,6 @@ members = [
   "crates/p2p-core",
   "crates/p2p-node",
   "crates/p2p-lab",
-  "crates/p2p-env",
+  "crates/p2p-env", "crates/p2p-noise",
 ]
 resolver = "2"
