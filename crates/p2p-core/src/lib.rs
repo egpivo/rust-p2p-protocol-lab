@@ -37,3 +37,11 @@ pub enum Message {
         hash: String,
     },
 }
+
+#[derive(Debug, Clone)]
+pub enum NodeEvent {
+    PeerConnected { node_id: u64, addr: SocketAddr },
+    PeerDisconnected { addr: SocketAddr },
+    MessageReceived { from: SocketAddr, msg: Message },
+    HandshakeFailed { addr: SocketAddr, reason: String },
+}

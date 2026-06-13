@@ -1,5 +1,7 @@
 use p2p_core::{Message, NodeId};
-use p2p_node::{MAX_PEERS, NoVerifier, PeerList, handle_inbound, send_msg};
+use p2p_node::{NoVerifier, PeerList, handle_inbound, send_msg};
+
+const MAX_PEERS: usize = 20;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -130,7 +132,10 @@ async fn main() {
                 tokio::spawn(async move {
                     match acceptor.accept(tcp_stream).await {
                         Ok(tls_stream) => {
-                            handle_inbound(tls_stream, peer_addr, node_id, port, peers, bl).await;
+                            handle_inbound(
+                                tls_stream, peer_addr, node_id, port, peers, bl, MAX_PEERS, None,
+                            )
+                            .await;
                         }
                         Err(e) => eprintln!("[{port}] TLS accept failed: {e}"),
                     }

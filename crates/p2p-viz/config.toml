@@ -1,0 +1,4 @@
+max_peers        = 20
+sybil_default    = 7
+eclipse_default  = 6
+partition_default = 3

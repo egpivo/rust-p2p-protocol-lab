@@ -18,7 +18,7 @@ async fn main() {
     let mut env = NetworkEnv::new(config);
     println!("=== P2P Security Gym ===");
     println!("Spawning {} honest nodes...", honest);
-    env.reset().await;
+    env.reset(None).await;
 
     // give nodes time to connect to each other
     tokio::time::sleep(Duration::from_secs(3)).await;

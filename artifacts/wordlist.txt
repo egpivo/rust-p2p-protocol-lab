@@ -1,8 +1,0 @@
-root,123456
-root,password
-admin,admin
-admin,password
-joseph,letmein
-root,toor
-admin,123456
-test,test

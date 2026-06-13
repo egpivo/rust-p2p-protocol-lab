@@ -1,11 +1,12 @@
-use p2p_core::{Message, NodeId};
-use p2p_node::{MAX_PEERS, PeerList, handle_inbound};
+use p2p_core::{Message, NodeEvent, NodeId};
+use p2p_node::{PeerList, handle_inbound};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::mpsc::UnboundedSender;
 
 pub struct EnvConfig {
     pub honest_nodes: usize,
@@ -46,7 +47,7 @@ impl NetworkEnv {
         }
     }
 
-    pub async fn reset(&mut self) {
+    pub async fn reset(&mut self, event_tx: Option<UnboundedSender<NodeEvent>>) {
         // kill old tasks
         for node in self.nodes.drain(..) {
             node.task.abort();
@@ -60,7 +61,8 @@ impl NetworkEnv {
         for i in 0..self.config.honest_nodes {
             let port = self.config.base_port + i as u16;
             let seeds = if i == 0 { vec![] } else { vec![seed] };
-            let (task, blocklist) = spawn_node(port, seeds).await;
+            let (task, blocklist) =
+                spawn_node(port, seeds, self.config.max_peers, event_tx.clone()).await;
             let addr = format!("127.0.0.1:{port}").parse().unwrap();
             self.nodes.push(NodeHandle {
                 port,
@@ -86,6 +88,8 @@ pub struct NodeHandle {
 pub async fn spawn_node(
     port: u16,
     seeds: Vec<SocketAddr>,
+    max_peers: usize,
+    event_tx: Option<UnboundedSender<NodeEvent>>,
 ) -> (tokio::task::JoinHandle<()>, p2p_node::BlockList) {
     let blocklist: p2p_node::BlockList = Arc::new(Mutex::new(std::collections::HashSet::new()));
     let blocklist_inner = blocklist.clone();
@@ -154,7 +158,7 @@ pub async fn spawn_node(
                         if let Ok(Message::Peers(list)) = serde_json::from_str(line.trim()) {
                             let mut p = peers.lock().unwrap();
                             for addr in list {
-                                if p.len() < MAX_PEERS && !p.contains(&addr) {
+                                if p.len() < max_peers && !p.contains(&addr) {
                                     p.push(addr);
                                 }
                             }
@@ -169,7 +173,16 @@ pub async fn spawn_node(
             if let Ok((stream, peer_addr)) = listener.accept().await {
                 let peers = peers.clone();
                 let bl = blocklist_inner.clone();
-                tokio::spawn(handle_inbound(stream, peer_addr, node_id, port, peers, bl));
+                tokio::spawn(handle_inbound(
+                    stream,
+                    peer_addr,
+                    node_id,
+                    port,
+                    peers,
+                    bl,
+                    max_peers,
+                    event_tx.clone(),
+                ));
             }
         }
     });
