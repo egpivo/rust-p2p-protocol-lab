@@ -1,0 +1,16 @@
+[package]
+name = "p2p-viz"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+axum = { version = "0.8", features = ["macros"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tower-http = { version = "0.6", features = ["fs", "cors"] }
+toml = "0.8"
+tokio-stream = { version = "0.1", features = ["sync"] }
+p2p-env = { path = "../p2p-env" }
+p2p-node = { path = "../p2p-node" }
+p2p-core = { path = "../p2p-core" }

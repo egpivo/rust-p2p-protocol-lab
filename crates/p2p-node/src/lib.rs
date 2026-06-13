@@ -1,4 +1,4 @@
-use p2p_core::{Message, NodeId};
+use p2p_core::{Message, NodeEvent, NodeId};
 use std::collections::HashSet;
 use std::net::IpAddr;
 use std::net::SocketAddr;
@@ -13,7 +13,6 @@ use tokio_rustls::rustls::{DigitallySignedStruct, Error as TlsError, SignatureSc
 
 pub type PeerList = Arc<Mutex<Vec<SocketAddr>>>;
 pub type BlockList = Arc<Mutex<HashSet<IpAddr>>>;
-pub const MAX_PEERS: usize = 8;
 
 #[derive(Debug)]
 pub struct NoVerifier;
@@ -66,6 +65,7 @@ where
     writer.write_all(line.as_bytes()).await
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn handle_inbound<S>(
     stream: S,
     peer_addr: SocketAddr,
@@ -73,6 +73,8 @@ pub async fn handle_inbound<S>(
     port: u16,
     peers: PeerList,
     blocklist: BlockList,
+    max_peers: usize,
+    event_tx: Option<tokio::sync::mpsc::UnboundedSender<NodeEvent>>,
 ) where
     S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
 {
@@ -95,11 +97,11 @@ pub async fn handle_inbound<S>(
             peers: their_peers,
         }) => {
             let mut p = peers.lock().unwrap();
-            if listen_addr.port() != 0 && p.len() < MAX_PEERS && !p.contains(&listen_addr) {
+            if listen_addr.port() != 0 && p.len() < max_peers && !p.contains(&listen_addr) {
                 p.push(listen_addr);
             }
             for addr in their_peers {
-                if p.len() < MAX_PEERS && !p.contains(&addr) {
+                if p.len() < max_peers && !p.contains(&addr) {
                     p.push(addr);
                 }
             }
@@ -121,6 +123,14 @@ pub async fn handle_inbound<S>(
         return;
     }
 
+    if let Some(ref tx) = event_tx {
+        tx.send(NodeEvent::PeerConnected {
+            node_id: remote_id.0,
+            addr: peer_addr,
+        })
+        .ok();
+    }
+
     println!(
         "[{}] <- handshake from {:?} at {}",
         node_id.0, remote_id, peer_addr
@@ -131,6 +141,16 @@ pub async fn handle_inbound<S>(
         line.clear();
         if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
             break;
+        }
+
+        if let Some(ref tx) = event_tx
+            && let Ok(msg) = serde_json::from_str::<Message>(line.trim())
+        {
+            tx.send(NodeEvent::MessageReceived {
+                from: peer_addr,
+                msg,
+            })
+            .ok();
         }
         match serde_json::from_str::<Message>(line.trim()) {
             Ok(Message::Ping) => {
@@ -154,7 +174,10 @@ pub async fn handle_inbound<S>(
             _ => {}
         }
     }
-
+    if let Some(ref tx) = event_tx {
+        tx.send(NodeEvent::PeerDisconnected { addr: peer_addr })
+            .ok();
+    }
     println!("[{}] connection closed from {}", node_id.0, peer_addr);
 }
 
