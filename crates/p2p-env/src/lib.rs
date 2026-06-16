@@ -39,6 +39,14 @@ pub struct NetworkEnv {
     nodes: Vec<NodeHandle>,
 }
 
+impl Drop for NetworkEnv {
+    fn drop(&mut self) {
+        for node in &self.nodes {
+            node.task.abort();
+        }
+    }
+}
+
 impl NetworkEnv {
     pub fn new(config: EnvConfig) -> Self {
         Self {
@@ -104,9 +112,18 @@ pub async fn spawn_node(
         for seed in seeds {
             let peers = peers.clone();
             tokio::spawn(async move {
-                let Ok(mut stream) = TcpStream::connect(seed).await else {
-                    return;
-                };
+                // retry with backoff: seed listener may not be bound yet when all nodes spawn together
+                let mut stream = None;
+                for attempt in 0..8u64 {
+                    if attempt > 0 {
+                        tokio::time::sleep(tokio::time::Duration::from_millis(50 * attempt)).await;
+                    }
+                    if let Ok(s) = TcpStream::connect(seed).await {
+                        stream = Some(s);
+                        break;
+                    }
+                }
+                let Some(mut stream) = stream else { return };
 
                 let known = peers.lock().unwrap().clone();
                 let mut msg = serde_json::to_string(&Message::Hello {
@@ -414,5 +431,157 @@ impl NetworkPartitionAttack {
 impl Attack for NetworkPartitionAttack {
     fn name(&self) -> &str {
         "NetworkPartition"
+    }
+}
+
+async fn bootstrap_from_seed(seed_addr: SocketAddr) -> Vec<SocketAddr> {
+    let Ok(stream) = TcpStream::connect(seed_addr).await else {
+        return vec![];
+    };
+    let node_id = NodeId::random();
+    let (read_half, mut write_half) = stream.into_split();
+    let mut reader = BufReader::new(read_half);
+    let mut line = String::new();
+
+    // send Hello
+    let mut msg = serde_json::to_string(&Message::Hello {
+        node_id,
+        listen_addr: "127.0.0.1:0".parse().unwrap(),
+        peers: vec![],
+    })
+    .unwrap();
+    msg.push('\n');
+    if write_half.write_all(msg.as_bytes()).await.is_err() {
+        return vec![];
+    }
+
+    // read Hello
+    if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
+        return vec![];
+    }
+    line.clear();
+
+    // send GetPeers
+    let mut get = serde_json::to_string(&Message::GetPeers).unwrap();
+    get.push('\n');
+    if write_half.write_all(get.as_bytes()).await.is_err() {
+        return vec![];
+    }
+
+    // read Peers response
+    if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
+        return vec![];
+    }
+    match serde_json::from_str(line.trim()) {
+        Ok(Message::Peers(list)) => list,
+        _ => vec![],
+    }
+}
+
+async fn run_poisoned_seed(
+    listener: TcpListener,
+    listen_addr: SocketAddr,
+    sybil_addrs: Vec<SocketAddr>,
+) {
+    while let Ok((stream, _)) = listener.accept().await {
+        let sybil_addrs = sybil_addrs.clone();
+        tokio::spawn(async move {
+            let node_id = NodeId::random();
+            let (read_half, mut write_half) = stream.into_split();
+            let mut reader = BufReader::new(read_half);
+            let mut line = String::new();
+
+            // read Hello
+            if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
+                return;
+            }
+
+            // reply Hello
+            let mut reply = serde_json::to_string(&Message::Hello {
+                node_id,
+                listen_addr,
+                peers: vec![],
+            })
+            .unwrap();
+            reply.push('\n');
+            if write_half.write_all(reply.as_bytes()).await.is_err() {
+                return;
+            }
+
+            // wait for GetPeers -> serve poisoned list
+            line.clear();
+            if reader.read_line(&mut line).await.unwrap_or(0) == 0 {
+                return;
+            }
+            if let Ok(Message::GetPeers) = serde_json::from_str(line.trim()) {
+                let mut resp = serde_json::to_string(&Message::Peers(sybil_addrs)).unwrap();
+                resp.push('\n');
+                write_half.write_all(resp.as_bytes()).await.ok();
+            }
+        });
+    }
+}
+
+pub struct BootstrapPoisoningAttack {
+    pub sybil_count: usize,
+}
+
+impl BootstrapPoisoningAttack {
+    pub async fn execute(&self, honest_env: &NetworkEnv) -> AttackResult {
+        let sybil_count = self.sybil_count;
+        let _max_peers = honest_env.config.max_peers;
+
+        // fake sybil addresses
+        let sybil_addrs: Vec<SocketAddr> = (0..sybil_count)
+            .map(|i| format!("127.0.0.1:{}", 19100 + i as u16).parse().unwrap())
+            .collect();
+
+        // Start a poisoned seed on an ephemeral port so repeated CLI/viz runs do not collide.
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let poisoned_addr = listener.local_addr().unwrap();
+
+        tokio::spawn(run_poisoned_seed(
+            listener,
+            poisoned_addr,
+            sybil_addrs.clone(),
+        ));
+        tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+
+        // honest seed is the first node in env
+        let honest_seed_addr: SocketAddr = format!("127.0.0.1:{}", honest_env.config.base_port)
+            .parse()
+            .unwrap();
+
+        // Measure both bootstraps.
+        let poisoned_peers = bootstrap_from_seed(poisoned_addr).await;
+        let _honest_peers_list = bootstrap_from_seed(honest_seed_addr).await;
+
+        let sybil_in = poisoned_peers
+            .iter()
+            .filter(|a| sybil_addrs.contains(a))
+            .count();
+        let total = poisoned_peers.len().max(1);
+        let sybil_ratio = sybil_in as f64 / total as f64 * 100.0;
+        let honest_in = poisoned_peers.len() - sybil_in;
+
+        let mut metrics = HashMap::new();
+        metrics.insert("bootstrap_sybil_ratio".to_string(), sybil_ratio);
+        metrics.insert("sybil_peers".to_string(), sybil_in as f64);
+        metrics.insert("honest_peers".to_string(), honest_in as f64);
+        metrics.insert("total_bootstrap_peers".to_string(), total as f64);
+
+        AttackResult {
+            success: sybil_ratio >= 50.0,
+            metrics,
+            summary: format!(
+                "bootstrap poisoned: {sybil_ratio:.1}% sybil ({sybil_in}/{total} peers)"
+            ),
+        }
+    }
+}
+
+impl Attack for BootstrapPoisoningAttack {
+    fn name(&self) -> &str {
+        "BootstrapPoisoning"
     }
 }
