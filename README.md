@@ -17,6 +17,7 @@ Built as a learning path toward blockchain security engineering — each phase a
 | 9 | `p2p-node` | P2P node with peer discovery |
 | 10–13 | `p2p-lab` | Crawler, Sybil, Eclipse, IDS monitor |
 | 14–15 | `p2p-env` | P2P Security Gym |
+| 16–20 | `p2p-viz` | Live attack visualizer (TLS, Noise, Eclipse, Sybil) |
 
 ---
 
@@ -45,6 +46,18 @@ pub trait Attack: Send + Sync {
 
 ---
 
+## Viz Frontend
+
+Interactive attack visualizer with live SSE replay.
+
+```bash
+cargo run -p p2p-viz          # serves http://localhost:3000
+```
+
+Pick a scenario (Sybil / Eclipse / Partition / Noise / TLS MITM), hit Run, watch the graph animate in real time.
+
+---
+
 ## Crate Structure
 
 ```
@@ -52,7 +65,8 @@ crates/
 ├── p2p-core/   Message, NodeId
 ├── p2p-node/   Honest P2P node (lib + binary)
 ├── p2p-lab/    Attack tools: crawl, sybil, eclipse, monitor
-└── p2p-env/    Security gym: NetworkEnv, Attack trait, CLI
+├── p2p-env/    Security gym: NetworkEnv, Attack trait, CLI
+└── p2p-viz/    Live attack visualizer (Axum + SSE + D3)
 ```
 
 ---
