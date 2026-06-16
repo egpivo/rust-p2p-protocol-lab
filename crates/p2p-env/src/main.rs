@@ -82,6 +82,20 @@ async fn main() {
                 println!("  {k}: {v:.1}");
             }
         }
+        "bootstrap" | "bootstrap-poisoning" => {
+            println!("Attack: BootstrapPoisoning");
+            println!("Sybil count: {}", sybil_count);
+
+            let attack = p2p_env::BootstrapPoisoningAttack { sybil_count };
+            let result = attack.execute(&env).await;
+
+            println!("\n=== Result ===");
+            println!("{}", result.summary);
+            println!("Success: {}", result.success);
+            for (k, v) in &result.metrics {
+                println!("  {k}: {v:.1}");
+            }
+        }
         other => {
             eprintln!("Unknown attack: {other}");
             std::process::exit(1);

@@ -1,4 +1,5 @@
-max_peers        = 20
-sybil_default    = 7
-eclipse_default  = 6
+max_peers         = 20
+sybil_default     = 7
+eclipse_default   = 6
 partition_default = 3
+bootstrap_default = 8

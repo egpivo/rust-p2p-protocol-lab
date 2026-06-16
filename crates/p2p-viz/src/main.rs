@@ -5,7 +5,10 @@ use axum::{
     routing::{get, post},
 };
 use p2p_core::NodeEvent;
-use p2p_env::{EclipseAttack, EnvConfig, NetworkEnv, NetworkPartitionAttack, SybilAttack};
+use p2p_env::{
+    BootstrapPoisoningAttack, EclipseAttack, EnvConfig, NetworkEnv, NetworkPartitionAttack,
+    SybilAttack,
+};
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use std::sync::Arc;
@@ -20,6 +23,7 @@ struct SimConfig {
     sybil_default: usize,
     eclipse_default: usize,
     partition_default: usize,
+    bootstrap_default: usize,
 }
 
 impl Default for SimConfig {
@@ -29,6 +33,7 @@ impl Default for SimConfig {
             sybil_default: 7,
             eclipse_default: 6,
             partition_default: 3,
+            bootstrap_default: 8,
         }
     }
 }
@@ -167,7 +172,7 @@ async fn run_scenario(
                 run_eclipse_scenario(
                     &tx,
                     params.count.unwrap_or(cfg.eclipse_default),
-                    cfg.max_peers,
+                    params.max_peers.unwrap_or(cfg.max_peers),
                 )
                 .await
             }
@@ -175,6 +180,14 @@ async fn run_scenario(
                 run_partition_scenario(
                     &tx,
                     params.count.unwrap_or(cfg.partition_default),
+                    cfg.max_peers,
+                )
+                .await
+            }
+            "bootstrap" => {
+                run_bootstrap_scenario(
+                    &tx,
+                    params.count.unwrap_or(cfg.bootstrap_default),
                     cfg.max_peers,
                 )
                 .await
@@ -529,6 +542,9 @@ async fn run_eclipse_scenario(tx: &Tx, count: usize, max_peers: usize) {
         sybil_count: count,
     };
 
+    let honest_peer_count = ["H1", "H2", "H3"].len();
+    let visually_accepted_attackers = max_peers.saturating_sub(honest_peer_count).min(count);
+
     for i in 1..=count {
         let id = format!("A{i}");
         tx.send(NodeSpawned {
@@ -538,41 +554,71 @@ async fn run_eclipse_scenario(tx: &Tx, count: usize, max_peers: usize) {
         })
         .ok();
         tokio::time::sleep(d(300)).await;
-        tx.send(ConnectionEstablished {
-            from: id,
-            to: "Victim".into(),
-        })
-        .ok();
-        tokio::time::sleep(d(200)).await;
+        if i <= visually_accepted_attackers {
+            tx.send(ConnectionEstablished {
+                from: id,
+                to: "Victim".into(),
+            })
+            .ok();
+            tokio::time::sleep(d(200)).await;
+        } else {
+            tokio::time::sleep(d(120)).await;
+        }
     }
+
+    // send fake Tip SSE event so the frontend logs "attacker_tip_FAKE delivered"
+    tokio::time::sleep(d(400)).await;
+    tx.send(PacketSent {
+        from: "A1".into(),
+        to: "Victim".into(),
+        data: r#"{"Tip":{"height":9999,"hash":"attacker_tip_FAKE"}}"#.into(),
+    })
+    .ok();
+    tokio::time::sleep(d(1000)).await;
 
     let result = attack.execute(&env).await;
+    // "honest_peers" key is what EclipseAttack::execute actually inserts
     let isolated = result
         .metrics
-        .get("honest_peers_remaining")
+        .get("honest_peers")
         .copied()
-        .unwrap_or(0.0) as usize
+        .unwrap_or(1.0) as usize  // default 1 → not isolated when key missing
         == 0;
 
-    tokio::time::sleep(d(400)).await;
-    for h in ["H1", "H2", "H3"] {
-        tx.send(ConnectionDropped {
-            from: "Victim".into(),
-            to: h.into(),
-        })
-        .ok();
-        tokio::time::sleep(d(350)).await;
-    }
     if isolated {
+        tokio::time::sleep(d(400)).await;
+        for h in ["H1", "H2", "H3"] {
+            tx.send(ConnectionDropped {
+                from: "Victim".into(),
+                to: h.into(),
+            })
+            .ok();
+            tokio::time::sleep(d(500)).await;
+        }
         tx.send(PeerSlotsFull {
             node: "Victim".into(),
         })
         .ok();
+        tokio::time::sleep(d(1200)).await;
+    } else {
+        if count > visually_accepted_attackers {
+            tx.send(PeerSlotsFull {
+                node: "Victim".into(),
+            })
+            .ok();
+        }
+        // Hold the failed state long enough for the slot-full cue to read before summarizing.
+        tokio::time::sleep(d(2200)).await;
     }
-    tokio::time::sleep(d(400)).await;
+
+    let honest_p = result.metrics.get("honest_peers").copied().unwrap_or(0.0);
+    let sybil_p = result.metrics.get("sybil_peers").copied().unwrap_or(0.0);
+    let occ = result.metrics.get("occupancy").copied().unwrap_or(0.0);
 
     tx.send(ScenarioComplete {
-        scenario: format!("eclipse — victim isolated: {isolated}"),
+        scenario: format!(
+            "eclipse — victim isolated: {isolated}, honest_peers: {honest_p:.0}, sybil_peers: {sybil_p:.0}, occupancy: {occ:.1}, max_peers: {max_peers}"
+        ),
     })
     .ok();
 }
@@ -643,6 +689,158 @@ async fn run_partition_scenario(tx: &Tx, per_group: usize, max_peers: usize) {
         scenario: format!("partition — {per_group}|{per_group} split"),
     })
     .ok();
+}
+
+async fn run_bootstrap_scenario(tx: &Tx, sybil_count: usize, max_peers: usize) {
+    use SimEvent::*;
+    let d = tokio::time::Duration::from_millis;
+    const SETUP_PAUSE: u64 = 550;
+    const SYBIL_SPAWN_PAUSE: u64 = 180;
+    const SYBIL_LINK_PAUSE: u64 = 160;
+    const PROTOCOL_PAUSE: u64 = 650;
+    const ACCEPT_PAUSE: u64 = 260;
+    const REVEAL_PAUSE: u64 = 1500;
+
+    tx.send(ScenarioReset).ok();
+    tokio::time::sleep(d(600)).await;
+
+    // honest network — Seed_H + 3 peers on ports 8400..8403
+    let mut env = NetworkEnv::new(EnvConfig {
+        honest_nodes: 4,
+        max_peers,
+        base_port: 8400,
+    });
+    env.reset(None).await;
+
+    tx.send(NodeSpawned {
+        id: "Seed_H".into(),
+        addr: "8400".into(),
+        role: "honest".into(),
+    })
+    .ok();
+    tokio::time::sleep(d(SETUP_PAUSE)).await;
+    for i in 1..=3usize {
+        let id = format!("N{i}");
+        tx.send(NodeSpawned {
+            id: id.clone(),
+            addr: format!("840{i}"),
+            role: "honest".into(),
+        })
+        .ok();
+        tokio::time::sleep(d(260)).await;
+        tx.send(ConnectionEstablished {
+            from: id,
+            to: "Seed_H".into(),
+        })
+        .ok();
+        tokio::time::sleep(d(220)).await;
+    }
+    tokio::time::sleep(d(700)).await;
+
+    // poisoned seed + sybil identities on ports 19100..
+    tx.send(NodeSpawned {
+        id: "Seed_P".into(),
+        addr: "8900".into(),
+        role: "attacker".into(),
+    })
+    .ok();
+    tokio::time::sleep(d(SETUP_PAUSE)).await;
+    for i in 1..=sybil_count {
+        let id = format!("S{i}");
+        tx.send(NodeSpawned {
+            id: id.clone(),
+            addr: format!("1910{i}"),
+            role: "sybil".into(),
+        })
+        .ok();
+        tokio::time::sleep(d(SYBIL_SPAWN_PAUSE)).await;
+        tx.send(ConnectionEstablished {
+            from: id,
+            to: "Seed_P".into(),
+        })
+        .ok();
+        tokio::time::sleep(d(SYBIL_LINK_PAUSE)).await;
+    }
+    tokio::time::sleep(d(900)).await;
+
+    // bootstrap node queries poisoned seed: Hello → GetPeers → Peers
+    tx.send(NodeSpawned {
+        id: "Bootstrap".into(),
+        addr: "8901".into(),
+        role: "victim".into(),
+    })
+    .ok();
+    tokio::time::sleep(d(SETUP_PAUSE)).await;
+    tx.send(PacketSent {
+        from: "Bootstrap".into(),
+        to: "Seed_P".into(),
+        data: "Hello".into(),
+    })
+    .ok();
+    tokio::time::sleep(d(PROTOCOL_PAUSE)).await;
+    tx.send(PacketSent {
+        from: "Seed_P".into(),
+        to: "Bootstrap".into(),
+        data: "Hello (peers: [])".into(),
+    })
+    .ok();
+    tokio::time::sleep(d(PROTOCOL_PAUSE)).await;
+    tx.send(PacketSent {
+        from: "Bootstrap".into(),
+        to: "Seed_P".into(),
+        data: "GetPeers".into(),
+    })
+    .ok();
+    tokio::time::sleep(d(PROTOCOL_PAUSE)).await;
+    tx.send(PacketSent {
+        from: "Seed_P".into(),
+        to: "Bootstrap".into(),
+        data: format!("Peers: [S1..S{sybil_count}] ← poisoned"),
+    })
+    .ok();
+    tokio::time::sleep(d(900)).await;
+
+    // bootstrap connects to sybil peers it received
+    let accepted_sybil_peers = sybil_count.min(max_peers);
+    for i in 1..=accepted_sybil_peers {
+        tx.send(ConnectionEstablished {
+            from: format!("S{i}"),
+            to: "Bootstrap".into(),
+        })
+        .ok();
+        tokio::time::sleep(d(ACCEPT_PAUSE)).await;
+    }
+    if accepted_sybil_peers >= max_peers {
+        tx.send(PeerSlotsFull {
+            node: "Bootstrap".into(),
+        })
+        .ok();
+        tokio::time::sleep(d(REVEAL_PAUSE)).await;
+    } else {
+        tokio::time::sleep(d(REVEAL_PAUSE)).await;
+    }
+
+    // actual measurement
+    let attack = BootstrapPoisoningAttack { sybil_count };
+    let result = attack.execute(&env).await;
+    let ratio = result
+        .metrics
+        .get("bootstrap_sybil_ratio")
+        .copied()
+        .unwrap_or(0.0);
+    let sybil_in = result.metrics.get("sybil_peers").copied().unwrap_or(0.0) as usize;
+    let honest_in = result.metrics.get("honest_peers").copied().unwrap_or(0.0) as usize;
+    let total = result
+        .metrics
+        .get("total_bootstrap_peers")
+        .copied()
+        .unwrap_or(0.0) as usize;
+
+    tx.send(ScenarioComplete {
+        scenario: format!(
+            "bootstrap — sybil_ratio: {ratio:.1}%, sybil_peers: {sybil_in}, honest_peers: {honest_in}, total_peers: {total}"
+        ),
+    }).ok();
 }
 
 fn make_event_forwarder(

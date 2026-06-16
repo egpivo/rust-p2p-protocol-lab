@@ -20,6 +20,7 @@ body{font-family:Inter,system-ui,-apple-system,sans-serif;background:#1e1e2e;col
 
 .ctrl-groups{flex:1;overflow-y:auto;padding:10px 0 0}
 .section-label{font-size:12px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:#45475a;padding:0 16px;margin-bottom:5px}
+.section-label.sub{margin-top:10px;padding-top:10px;border-top:1px solid #313244}
 .scenario-row{padding:2px 10px}
 .scenario-btn{width:100%;background:#292a3b;color:#cdd6f4;border:1px solid rgba(255,255,255,0.07);padding:7px 10px;cursor:pointer;font-family:inherit;font-size:16px;border-radius:6px;text-align:left;transition:border-color .15s,background .15s}
 .scenario-btn:hover:not(:disabled){background:#313244}
@@ -53,12 +54,12 @@ body{font-family:Inter,system-ui,-apple-system,sans-serif;background:#1e1e2e;col
 /* ── Graph main ── */
 .graph-main{flex:1;display:flex;flex-direction:column;min-width:0}
 
-.scenario-header{height:58px;background:#181825;border-bottom:1px solid #313244;display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0}
+.scenario-header{background:#181825;border-bottom:1px solid #313244;display:flex;flex-direction:column;justify-content:center;padding:8px 16px;gap:5px;flex-shrink:0;min-height:58px}
 .sh-meta{display:flex;align-items:center;gap:10px;min-width:0}
 .sh-tag{font-size:12px;font-weight:700;letter-spacing:1.4px;padding:3px 8px;border-radius:4px;border:1px solid;white-space:nowrap;flex-shrink:0}
 .sh-title{font-size:18px;font-weight:700;color:#cdd6f4;white-space:nowrap}
 .sh-goal{font-size:13px;color:#717ba9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.step-stepper{display:flex;align-items:center;gap:3px;margin-left:auto;flex-shrink:0}
+.step-stepper{display:flex;align-items:center;gap:3px;flex-shrink:0}
 .step-pill{display:flex;align-items:center;gap:5px;padding:4px 8px;border-radius:4px;border:1px solid transparent;white-space:nowrap}
 .step-pill-num{font-size:12px;font-weight:700;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .step-pill-label{font-size:13px}
@@ -164,8 +165,10 @@ body{font-family:Inter,system-ui,-apple-system,sans-serif;background:#1e1e2e;col
 .link.normal  {stroke:#45475a;stroke-width:1.5px}
 .link.verified{stroke:#a6e3a1;stroke-width:2px}
 .link.tls     {stroke:#89b4fa;stroke-width:1.5px;stroke-dasharray:6 3}
+.link.mitm    {stroke:#f38ba8;stroke-width:2px;stroke-dasharray:7 3;opacity:.9}
 .link.sybil   {stroke:#fab387;stroke-width:1.5px;opacity:.4}
 .link.blocked {stroke:#313244;stroke-width:1.5px;stroke-dasharray:4 4}
+.link.attention{stroke:#a6e3a1;stroke-width:4px;filter:drop-shadow(0 0 5px rgba(166,227,161,.65))}
 
 .val-yes   {color:#a6e3a1}
 .val-no    {color:#f38ba8}
@@ -184,7 +187,7 @@ body{font-family:Inter,system-ui,-apple-system,sans-serif;background:#1e1e2e;col
     <div><div class="brand-name">P2P Security Lab</div><div class="brand-sub">Simulated · local only</div></div>
   </div>
   <div class="ctrl-groups">
-    <div class="section-label">Scenarios</div>
+    <div class="section-label">Attacks</div>
     <div class="scenario-row"><button class="scenario-btn" id="btn-sybil"     data-scenario="sybil">Sybil Attack</button></div>
     <div class="param-row"><span class="param-lbl">Sybil identities <span class="param-hint" id="hint-sybil"></span></span><input class="param-input" id="param-sybil"     type="number" min="1" max="100" value="10"></div>
     <div class="preset-row">
@@ -195,11 +198,21 @@ body{font-family:Inter,system-ui,-apple-system,sans-serif;background:#1e1e2e;col
       </div>
     </div>
     <div class="scenario-row"><button class="scenario-btn" id="btn-eclipse"   data-scenario="eclipse">Eclipse Attack</button></div>
-    <div class="param-row"><span class="param-lbl">Eclipse attackers <span class="param-hint" id="hint-eclipse"></span></span><input class="param-input" id="param-eclipse"   type="number" min="1" max="20" value="6"></div>
+    <div class="param-row"><span class="param-lbl">Eclipse attackers <span class="param-hint" id="hint-eclipse"></span></span><input class="param-input" id="param-eclipse"   type="number" min="1" max="100" value="20"></div>
+    <div class="preset-row">
+      <span class="preset-label">Preset</span>
+      <div class="preset-toggle">
+        <button class="preset-btn active" id="preset-eclipse-article" data-eclipsepreset="article">Article</button>
+        <button class="preset-btn" id="preset-eclipse-stress" data-eclipsepreset="stress">Stress</button>
+      </div>
+    </div>
     <div class="scenario-row"><button class="scenario-btn" id="btn-partition" data-scenario="partition">Network Partition</button></div>
     <div class="param-row"><span class="param-lbl">Nodes per group</span><input class="param-input" id="param-partition" type="number" min="1" max="8"  value="3"></div>
-    <div class="scenario-row"><button class="scenario-btn" id="btn-tls-mitm"  data-scenario="tls-mitm">TLS MITM</button></div>
-    <div class="scenario-row"><button class="scenario-btn" id="btn-noise"     data-scenario="noise">Noise Protocol</button></div>
+    <div class="scenario-row"><button class="scenario-btn" id="btn-bootstrap" data-scenario="bootstrap">Bootstrap Poisoning</button></div>
+    <div class="param-row"><span class="param-lbl">Sybil identities <span class="param-hint" id="hint-bootstrap"></span></span><input class="param-input" id="param-bootstrap" type="number" min="1" max="20" value="8"></div>
+    <div class="scenario-row"><button class="scenario-btn" id="btn-tls-mitm"  data-scenario="tls-mitm">TLS MITM Attack</button></div>
+    <div class="section-label sub">Defenses</div>
+    <div class="scenario-row"><button class="scenario-btn" id="btn-noise"     data-scenario="noise">Noise Handshake Defense</button></div>
     <div class="defense-section">
       <div class="defense-row">
         <span class="defense-lbl">Defense</span>
@@ -303,28 +316,26 @@ const SYBIL_PRESETS={
   article:{label:'Article run',count:10,maxPeers:8},
   stress:{label:'Stress test',count:19,maxPeers:20},
 };
+const ECLIPSE_PRESETS={
+  article:{label:'Article run',count:20,maxPeers:8},
+  stress:{label:'Stress test',count:50,maxPeers:20},
+};
 function applyConfig(c){
   CFG=c;
-  const cap=c.max_peers-1;
   const s=document.getElementById('param-sybil');
   const e=document.getElementById('param-eclipse');
   const p=document.getElementById('param-partition');
   if(s){s.max=100;s.value=SYBIL_PRESETS.article.count;}
-  if(e){e.max=cap;e.value=Math.min(c.eclipse_default,cap);}
+  if(e){e.max=100;e.value=ECLIPSE_PRESETS.article.count;}
   if(p){p.value=c.partition_default;}
   const hs=document.getElementById('hint-sybil');
   const he=document.getElementById('hint-eclipse');
   if(hs)hs.textContent=`(${SYBIL_PRESETS.article.label})`;
-  if(he)he.textContent=`(max ${cap})`;
-  // wire live clamping
-  [['param-sybil',100],['param-eclipse',cap]].forEach(([id,mx])=>{
-    const el=document.getElementById(id);if(!el)return;
-    el.addEventListener('input',()=>{
-      const over=parseInt(el.value)>mx;
-      el.classList.toggle('over',over);
-      if(over)el.title=`Capped at ${mx} (max_peers − 1)`;else el.title='';
-    });
-  });
+  if(he)he.textContent=`(${ECLIPSE_PRESETS.article.label})`;
+  const b=document.getElementById('param-bootstrap');
+  const hb=document.getElementById('hint-bootstrap');
+  if(b){b.max=20;b.value=c.bootstrap_default;}
+  if(hb)hb.textContent=`(max ${c.max_peers-1})`;
 }
 
 /* ─── HELPERS ──────────────────────────────────────────── */
@@ -333,6 +344,7 @@ const scoreSign=n=>n>=0?'+'+n.toFixed(2):n.toFixed(2);
 const scoreClass=n=>n>=0.7?'val-yes':n>=0.2?'val-warn':'val-no';
 const pct=v=>v==null?'—':Number(v).toFixed(1).replace(/\.0$/,'')+'%';
 function activeSybilPreset(){return SYBIL_PRESETS[state.sybilPreset]||SYBIL_PRESETS.article;}
+function activeEclipsePreset(){return ECLIPSE_PRESETS[state.eclipsePreset]||ECLIPSE_PRESETS.article;}
 function activeSybilMaxPeers(){return state.metrics.max_peers||state.runParams.max_peers||activeSybilPreset().maxPeers;}
 function sybilTable(m){
   const max=m.max_peers||activeSybilMaxPeers();
@@ -419,18 +431,24 @@ const SCENARIOS={
     color:'#fab387',tag:'ECLIPSE',
     steps:['Sybil peers connect','Fake Tip delivered','Honest peers checked'],
 
-    resultSummary(m){return[
+    resultSummary(m){
+      const mp=m.max_peers||activeEclipsePreset().maxPeers;
+      return[
       {k:'Fake Tip',    v:m.fake_tip?'received':'—',                                  cls:m.fake_tip?'val-warn':''},
-      {k:'Sybil peers', v:m.sybil_count!=null?`${m.sybil_count}/${CFG.max_peers}`:'—',cls:'val-orange'},
+      {k:'Sybil peers', v:m.sybil_count!=null?`${m.sybil_count}/${mp}`:'—',          cls:'val-orange'},
       {k:'Honest peers',v:fmt(m.honest_count),                                        cls:'val-blue'},
+      {k:'Occupancy',   v:m.occupancy!=null?pct(m.occupancy):'—',                    cls:'val-warn'},
       {k:'state_diverged',v:m.state_diverged!==undefined?String(m.state_diverged):'—',cls:m.state_diverged?'val-no':'val-yes'},
-      {k:'Status',      v:fmt(m.result),                                              cls:m.result==='Eclipse failed'?'val-yes':m.result?'val-no':''},
+      {k:'Status',      v:fmt(m.result),                                              cls:m.result==='Success: false'?'val-yes':m.result?'val-no':''},
     ]},
 
-    observation(m){return[
+    observation(m){
+      const mp=m.max_peers||activeEclipsePreset().maxPeers;
+      return[
       {k:'fake_tip',       v:m.fake_tip?'received':'—',                 cls:m.fake_tip?'val-warn':''},
-      {k:'sybil_peers',   v:m.sybil_count!=null?`${m.sybil_count}/${CFG.max_peers}`:'—',cls:'val-orange'},
+      {k:'sybil_peers',   v:m.sybil_count!=null?`${m.sybil_count}/${mp}`:'—', cls:'val-orange'},
       {k:'honest_peers',  v:fmt(m.honest_count),                        cls:'val-blue'},
+      {k:'occupancy',     v:m.occupancy!=null?pct(m.occupancy):'—',    cls:'val-warn'},
       {k:'state_diverged',v:m.state_diverged!==undefined?String(m.state_diverged):'—',cls:m.state_diverged?'val-no':'val-yes'},
     ]},
 
@@ -446,8 +464,13 @@ const SCENARIOS={
       {policy:'Adaptive policy', detail:'anchor peer · diverged false',   scoreVal:+0.85},
     ],
 
-    metricsBar(m){return[
+    metricsBar(m){
+      const mp=m.max_peers||activeEclipsePreset().maxPeers;
+      return[
       {l:'Fake Tip received',v:m.fake_tip?'yes':'—',              c:'#f38ba8'},
+      ...(m.sybil_count!=null?[{l:'Sybil peers',v:`${m.sybil_count}/${mp}`,c:'#fab387'}]:[]),
+      ...(m.honest_count!=null?[{l:'Honest peers',v:String(m.honest_count),c:'#89b4fa'}]:[]),
+      ...(m.occupancy!=null?[{l:'Occupancy',v:pct(m.occupancy),c:'#f9e2af'}]:[]),
       {l:'Honest path',      v:m.state_diverged?'broken':'alive', c:m.state_diverged?'#f38ba8':'#a6e3a1'},
       {l:'state_diverged',   v:m.state_diverged!==undefined?String(m.state_diverged):'—',c:m.state_diverged?'#f38ba8':'#a6e3a1'},
     ]},
@@ -492,77 +515,122 @@ const SCENARIOS={
   },
 
   'tls-mitm':{
-    title:'TLS MITM',goal:'Goal: intercept unverified session',
-    color:'#cba6f7',tag:'TLS MITM',
-    steps:['Mallory intercepts','Session relayed','Victim accepts forged session'],
+    title:'TLS MITM Attack',goal:'Goal: relay traffic without peer authentication',
+    color:'#cba6f7',tag:'MITM',
+    steps:['Relay inserted','Session re-encrypted','Intercept confirmed'],
 
     resultSummary(m){return[
-      {k:'Mallory',       v:'inserted',  cls:'val-no'},
-      {k:'Authentication',v:'missing',   cls:'val-no'},
-      {k:'Status',        v:fmt(m.result)||'Intercepted',cls:'val-no'},
+      {k:'attacker_in_path',v:String(m.attacker_in_path??true),          cls:'val-no'},
+      {k:'verified_peer',   v:String(m.verified_peer??false),            cls:'val-no'},
+      {k:'session',         v:m.session||'intercepted',                  cls:'val-no'},
+      {k:'Status',          v:m.result||'Attack success: true',          cls:'val-no'},
     ]},
 
     observation(m){return[
-      {k:'mallory',       v:'inserted',  cls:'val-no'},
-      {k:'encryption',    v:'none/weak', cls:'val-warn'},
-      {k:'auth',          v:'missing',   cls:'val-no'},
+      {k:'path',          v:m.attacker_in_path===false?'direct':'Alice → Mallory → Bob',cls:m.attacker_in_path===false?'val-yes':'val-no'},
+      {k:'verified_peer', v:String(m.verified_peer??false),                    cls:m.verified_peer?'val-yes':'val-no'},
+      {k:'session',       v:m.session||'intercepted',                           cls:'val-no'},
     ]},
 
-    calcScore(_m,p){const bonus={none:0,static:0.90,adaptive:1.40}[p]??0;return Math.max(-1,Math.min(1,-0.90+bonus));},
+    calcScore(_m,p){const bonus={none:0,static:0.90,adaptive:1.20}[p]??0;return Math.max(-1,Math.min(1,-0.90+bonus));},
     scoreRows(m,p){const n=this.calcScore(m,p);return[
-      {k:'MITM accepted', v:p==='none'?'yes':'no',               cls:p==='none'?'val-no':'val-yes'},
-      {k:'Score',         v:scoreSign(n),                        cls:scoreClass(n)},
+      {k:'Attacker in path',v:String(m.attacker_in_path??true),cls:m.attacker_in_path===false?'val-yes':'val-no'},
+      {k:'Peer verified',   v:String(m.verified_peer??false), cls:m.verified_peer?'val-yes':'val-no'},
+      {k:'Score',           v:scoreSign(n),                   cls:scoreClass(n)},
     ]},
 
     policyComparison:[
-      {policy:'No defense',      detail:'session: compromised',  scoreVal:-1.00},
-      {policy:'Static rules',    detail:'session: terminated',   scoreVal:+0.50},
-      {policy:'Adaptive policy', detail:'session: renegotiated', scoreVal:+0.75},
+      {policy:'No defense',      detail:'attacker in path · unverified peer', scoreVal:-1.00},
+      {policy:'Static rules',    detail:'drop unverified relay',              scoreVal:+0.50},
+      {policy:'Adaptive policy', detail:'reconnect verified peer',            scoreVal:+0.75},
     ],
 
-    metricsBar(_m){return[
-      {l:'Mallory',v:'inserted',    c:'#f38ba8'},
-      {l:'session', v:'intercepted',c:'#cba6f7'},
-      {l:'auth',    v:'missing',    c:'#f38ba8'},
+    metricsBar(m){return[
+      {l:'attacker_in_path',v:String(m.attacker_in_path??true), c:'#f38ba8'},
+      {l:'verified_peer',   v:String(m.verified_peer??false),  c:'#f38ba8'},
+      {l:'session',         v:m.session||'intercepted',        c:'#cba6f7'},
+      {l:'MITM',            v:'success',                       c:'#f38ba8'},
     ]},
   },
 
   noise:{
-    title:'Noise Protocol',goal:'Goal: block MITM via remote key verification',
-    color:'#a6e3a1',tag:'NOISE',
-    steps:['Mallory intercepts','Key mismatch detected','Alice verifies Bob directly'],
+    title:'Noise Handshake Defense',goal:'Goal: reject unauthenticated relay',
+    color:'#a6e3a1',tag:'DEFENSE',
+    steps:['Relay attempt','Remote key mismatch','Verified session established'],
 
     resultSummary(m){return[
-      {k:'Mallory',      v:m.mitm_detected!==undefined?'detected':'—',     cls:m.mitm_detected?'val-warn':''},
-      {k:'Remote key',   v:m.mitm_detected?'mismatch':'—',                 cls:m.mitm_detected?'val-no':''},
-      {k:'Authentication',v:m.verified?'verified':'pending',               cls:m.verified?'val-yes':'val-warn'},
-      {k:'Status',       v:m.result||(m.verified?'MITM blocked':'—'),      cls:m.verified?'val-yes':'val-warn'},
+      {k:'key_mismatch',    v:String(m.mitm_detected??false),                  cls:m.mitm_detected?'val-warn':''},
+      {k:'attacker_in_path',v:m.attacker_in_path!==undefined?String(m.attacker_in_path):'—',cls:m.verified?'val-yes':'val-warn'},
+      {k:'verified_peer',   v:m.verified_peer!==undefined?String(m.verified_peer):String(m.verified??false),cls:m.verified?'val-yes':'val-warn'},
+      {k:'Status',          v:m.result||(m.verified?'Attack success: false':'—'),cls:m.verified?'val-yes':'val-warn'},
     ]},
 
     observation(m){return[
-      {k:'mitm_detected',  v:fmt(m.mitm_detected??false),  cls:m.mitm_detected?'val-warn':''},
-      {k:'key_mismatch',   v:m.mitm_detected?'yes':'—',    cls:m.mitm_detected?'val-no':''},
-      {k:'encryption',     v:'active',                     cls:'val-yes'},
-      {k:'authentication', v:m.verified?'verified':'pending',cls:m.verified?'val-yes':'val-warn'},
+      {k:'relay_attempt',   v:m.mitm_detected!==undefined?'detected':'—',cls:m.mitm_detected?'val-warn':''},
+      {k:'remote_key',      v:m.mitm_detected?'mismatch':'—',            cls:m.mitm_detected?'val-no':''},
+      {k:'verified_peer',   v:String(m.verified_peer??m.verified??false),cls:m.verified?'val-yes':'val-warn'},
+      {k:'session',         v:m.session||(m.verified?'authenticated':'pending'),cls:m.verified?'val-yes':'val-warn'},
     ]},
 
-    calcScore(m,p){const base=m.verified?1.00:m.mitm_detected?0.50:-0.20;const bonus={none:-1.20,static:0,adaptive:0}[p]??0;return Math.max(-1,Math.min(1,base+bonus));},
+    calcScore(m,p){const base=m.verified?1.00:m.mitm_detected?0.45:-0.20;const bonus={none:-1.20,static:0,adaptive:0.15}[p]??0;return Math.max(-1,Math.min(1,base+bonus));},
     scoreRows(m,p){const n=this.calcScore(m,p);return[
-      {k:'MITM accepted',   v:p==='none'?'yes':'no',    cls:p==='none'?'val-no':'val-yes'},
-      {k:'Session verified',v:m.verified?'yes':'no',    cls:m.verified?'val-yes':'val-no'},
-      {k:'Score',           v:scoreSign(n),             cls:scoreClass(n)},
+      {k:'Attacker in path',v:String(m.attacker_in_path??true), cls:m.attacker_in_path===false?'val-yes':'val-no'},
+      {k:'Peer verified',   v:String(m.verified_peer??false),  cls:m.verified_peer?'val-yes':'val-no'},
+      {k:'Score',           v:scoreSign(n),                    cls:scoreClass(n)},
     ]},
 
     policyComparison:[
-      {policy:'No defense',      detail:'MITM accepted · session broken',  scoreVal:-1.00},
-      {policy:'Static rules',    detail:'MITM blocked · session verified', scoreVal:+1.00},
-      {policy:'Adaptive policy', detail:'MITM blocked · reconnect direct', scoreVal:+1.00},
+      {policy:'No defense',      detail:'relay accepted · peer unverified', scoreVal:-1.00},
+      {policy:'Static rules',    detail:'remote key mismatch blocked',      scoreVal:+1.00},
+      {policy:'Adaptive policy', detail:'verified reconnect established',   scoreVal:+1.00},
     ],
 
     metricsBar(m){return[
-      {l:'MITM detected', v:m.mitm_detected?'yes':'—',      c:m.mitm_detected?'#f38ba8':'#717ba9'},
-      {l:'key mismatch',  v:m.mitm_detected?'blocked':'—',  c:'#a6e3a1'},
-      {l:'session',       v:m.verified?'verified':'pending', c:m.verified?'#a6e3a1':'#717ba9'},
+      {l:'remote_key',      v:m.mitm_detected?'mismatch':'—',              c:m.mitm_detected?'#f38ba8':'#717ba9'},
+      {l:'attacker_in_path',v:String(m.attacker_in_path??(m.verified?false:true)),c:m.verified?'#a6e3a1':'#f38ba8'},
+      {l:'verified_peer',   v:String(m.verified_peer??m.verified??false), c:m.verified?'#a6e3a1':'#717ba9'},
+      {l:'session',         v:m.session||(m.verified?'authenticated':'pending'),c:m.verified?'#a6e3a1':'#717ba9'},
+    ]},
+  },
+
+  bootstrap:{
+    title:'Bootstrap Poisoning',goal:'Goal: sybil_ratio ≥ 50% on first peer list',
+    color:'#f38ba8',tag:'BOOTSTRAP',
+    steps:['Honest env running','Poisoned seed serving sybil list','Victim bootstraps from poisoned seed'],
+
+    resultSummary(m){const ratio=m.sybil_ratio;return[
+      {k:'Sybil peers',   v:fmt(m.sybil_peers),                                        cls:'val-no'},
+      {k:'Honest peers',  v:fmt(m.honest_peers),                                       cls:'val-yes'},
+      {k:'Total peers',   v:fmt(m.total_peers),                                        cls:''},
+      {k:'Sybil ratio',   v:ratio!=null?pct(ratio):'—',                               cls:ratio>=50?'val-no':'val-warn'},
+      {k:'Status',        v:fmt(m.result),                                             cls:m.result==='Poisoned'?'val-no':'val-warn'},
+    ]},
+
+    observation(m){return[
+      {k:'bootstrap_sybil_ratio', v:m.sybil_ratio!=null?pct(m.sybil_ratio):'—', cls:m.sybil_ratio>=50?'val-no':'val-warn'},
+      {k:'sybil_peers',           v:fmt(m.sybil_peers),                          cls:'val-no'},
+      {k:'honest_peers',          v:fmt(m.honest_peers),                         cls:'val-yes'},
+      {k:'total_peers',           v:fmt(m.total_peers),                          cls:''},
+    ]},
+
+    calcScore(m,p){const ratio=m.sybil_ratio??100;const base=ratio>=50?-0.80:ratio>=25?-0.30:0.10;const bonus={none:-0.20,static:0.50,adaptive:0.70}[p]??0;return Math.max(-1,Math.min(1,base+bonus));},
+    scoreRows(m,p){const n=this.calcScore(m,p);return[
+      {k:'Sybil ratio',   v:m.sybil_ratio!=null?pct(m.sybil_ratio):'—', cls:m.sybil_ratio>=50?'val-no':'val-warn'},
+      {k:'Poisoned',      v:m.result==='Poisoned'?'yes':'partial',        cls:m.result==='Poisoned'?'val-no':'val-warn'},
+      {k:'Score',         v:scoreSign(n),                                  cls:scoreClass(n)},
+    ]},
+
+    policyComparison:[
+      {policy:'No defense',      detail:'peer table: 100% sybil',           scoreVal:-1.00},
+      {policy:'Static rules',    detail:'seed diversity check · sybil -50%', scoreVal:+0.30},
+      {policy:'Adaptive policy', detail:'peer sampling · sybil < 10%',       scoreVal:+0.80},
+    ],
+
+    metricsBar(m){return[
+      {l:'sybil_peers',  v:fmt(m.sybil_peers),                                    c:'#f38ba8'},
+      {l:'honest_peers', v:fmt(m.honest_peers),                                   c:'#a6e3a1'},
+      {l:'total_peers',  v:fmt(m.total_peers),                                    c:'#717ba9'},
+      {l:'sybil_ratio',  v:m.sybil_ratio!=null?pct(m.sybil_ratio):'—',           c:m.sybil_ratio>=50?'#f38ba8':'#fab387'},
     ]},
   },
 };
@@ -572,6 +640,7 @@ const state={
   activeScenario:null, stepIndex:-1,
   defensePolicy:'static',
   sybilPreset:'article',
+  eclipsePreset:'article',
   runParams:{},
   metrics:{},
   detailsExpanded:false,
@@ -599,6 +668,9 @@ function displayNodeId(id){
   if(state.activeScenario==='sybil'&&/^S\d+$/.test(id)&&(state.runParams.count||0)>12){
     return Number(id.slice(1))>10?'Sx':id;
   }
+  if(state.activeScenario==='eclipse'&&/^A\d+$/.test(id)&&(state.runParams.count||0)>12){
+    return Number(id.slice(1))>10?'Ax':id;
+  }
   return id;
 }
 function upsertNode(id,role,label){
@@ -612,41 +684,84 @@ function setNodePosition(id,x,y){
   const n=nodes.find(n=>n.id===id);if(!n)return;
   n.fx=x;n.fy=y;n.x=x;n.y=y;
 }
-function arrangeFinalGraph(){
+function animateNodeTargets(targets,duration=950){
+  if(sim)sim.stop();
+  const starts=new Map(nodes.map(n=>[n.id,{x:n.x??W/2,y:n.y??H/2}]));
+  d3.transition().duration(duration).ease(d3.easeCubicOut)
+    .tween('final-layout',()=>{
+      return t=>{
+        targets.forEach((pos,id)=>{
+          const n=nodes.find(n=>n.id===id),s=starts.get(id);
+          if(!n||!s)return;
+          n.x=s.x+(pos.x-s.x)*t;
+          n.y=s.y+(pos.y-s.y)*t;
+          if(t>=1){n.fx=pos.x;n.fy=pos.y;}
+        });
+        ticked();
+      };
+    })
+    .on('end',()=>{redraw();});
+}
+function arrangeFinalGraph(smooth=false){
   if(!state.activeScenario)return;
   const cx=W/2,cy=H/2-20;
+  const targets=new Map();
+  const place=(id,x,y)=>{
+    if(smooth){
+      const n=nodes.find(n=>n.id===id);if(!n)return;
+      const p=graphPads();
+      targets.set(id,{
+        x:Math.max(p.left,Math.min(W-p.right,x)),
+        y:Math.max(p.top,Math.min(H-p.bottom,y)),
+      });
+    }else{
+      setNodePosition(id,x,y);
+    }
+  };
   if(state.activeScenario==='sybil'){
-    setNodePosition('N1',cx,cy);
+    place('N1',cx,cy);
     const sybils=nodes.filter(n=>n.role==='sybil');
     const honest=nodes.filter(n=>n.role==='honest'&&n.id!=='N1');
     const r=Math.min(170,Math.max(110,Math.min(W,H)/4));
     sybils.forEach((n,i)=>{
       const a=(105+i*(150/Math.max(1,sybils.length-1)))*Math.PI/180;
-      setNodePosition(n.id,cx+Math.cos(a)*r,cy+Math.sin(a)*r);
+      place(n.id,cx+Math.cos(a)*r,cy+Math.sin(a)*r);
     });
-    honest.forEach((n,i)=>setNodePosition(n.id,cx+190,cy-70+i*70));
+    honest.forEach((n,i)=>place(n.id,cx+190,cy-70+i*70));
   }else if(state.activeScenario==='eclipse'){
-    setNodePosition('Victim',cx,cy);
+    place('Victim',cx,cy);
     const attackers=nodes.filter(n=>n.role==='attacker');
     const honest=nodes.filter(n=>n.role==='honest');
     attackers.forEach((n,i)=>{
       const a=(i/Math.max(1,attackers.length))*Math.PI*2-Math.PI/2;
-      setNodePosition(n.id,cx+Math.cos(a)*145,cy+Math.sin(a)*145);
+      place(n.id,cx+Math.cos(a)*145,cy+Math.sin(a)*145);
     });
-    honest.forEach((n,i)=>setNodePosition(n.id,cx+260,cy-80+i*80));
+    honest.forEach((n,i)=>place(n.id,cx+260,cy-80+i*80));
   }else if(state.activeScenario==='partition'){
     const ps=nodes.filter(n=>/^P\d+$/.test(n.id)).sort((a,b)=>Number(a.id.slice(1))-Number(b.id.slice(1)));
     const split=Math.ceil(ps.length/2),a=ps.slice(0,split),b=ps.slice(split);
-    a.forEach((n,i)=>setNodePosition(n.id,cx-170+Math.cos(i/Math.max(1,a.length)*Math.PI*2)*75,cy+Math.sin(i/Math.max(1,a.length)*Math.PI*2)*75));
-    b.forEach((n,i)=>setNodePosition(n.id,cx+170+Math.cos(i/Math.max(1,b.length)*Math.PI*2)*75,cy+Math.sin(i/Math.max(1,b.length)*Math.PI*2)*75));
-  }else if(state.activeScenario==='noise'){
-    setNodePosition('Alice',cx-80,cy+45);
-    setNodePosition('Bob',cx+80,cy+45);
-    setNodePosition('Mallory',cx,cy-125);
+    a.forEach((n,i)=>place(n.id,cx-170+Math.cos(i/Math.max(1,a.length)*Math.PI*2)*75,cy+Math.sin(i/Math.max(1,a.length)*Math.PI*2)*75));
+    b.forEach((n,i)=>place(n.id,cx+170+Math.cos(i/Math.max(1,b.length)*Math.PI*2)*75,cy+Math.sin(i/Math.max(1,b.length)*Math.PI*2)*75));
+  }else if(state.activeScenario==='tls-mitm'||state.activeScenario==='noise'){
+    place('Alice',cx-80,cy+45);
+    place('Bob',cx+80,cy+45);
+    place('Mallory',cx,cy-125);
+  }else if(state.activeScenario==='bootstrap'){
+    const sybils=nodes.filter(n=>n.role==='sybil');
+    const n=sybils.length;
+    place('Seed_P',cx-230,cy-30);
+    place('Bootstrap',cx+180,cy-30);
+    sybils.forEach((nd,i)=>{
+      place(nd.id, cx-180+i*(360/Math.max(1,n-1)), cy+145);
+    });
   }
-  nodes.forEach(clampNode);
-  if(sim)sim.alpha(0.35).restart();
-  redraw();
+  if(smooth){
+    animateNodeTargets(targets);
+  }else{
+    nodes.forEach(clampNode);
+    if(sim)sim.alpha(0.35).restart();
+    redraw();
+  }
 }
 
 function initSim(){
@@ -665,10 +780,14 @@ function ticked(){
 }
 function redraw(){
   linkGroup.selectAll('path.link').data(links,d=>d.id)
-    .join(e=>e.append('path').attr('class',d=>`link ${d.style||'normal'}`).style('opacity',0).call(s=>s.transition().duration(300).style('opacity',1)));
+    .join(
+      e=>e.append('path').attr('class',d=>`link ${d.style||'normal'}`).style('opacity',0).call(s=>s.transition().duration(300).style('opacity',1)),
+      u=>u.attr('class',d=>`link ${d.style||'normal'}`),
+      x=>x.transition().duration(200).style('opacity',0).remove()
+    );
   nodeGroup.selectAll('g.node').data(nodes,d=>d.id).join(enter=>{
     const g=enter.append('g').attr('class','node').style('opacity',0).attr('transform',d=>`translate(${d.x??W/2},${d.y??H/2})`);
-    g.append('circle').attr('r',d=>d.id==='Sx'?25:d.role==='attacker'?20:18)
+    g.append('circle').attr('r',d=>d.id==='Sx'||d.id==='Ax'?25:d.role==='attacker'?20:18)
       .attr('fill',d=>ROLE_COLOR[d.role]+'22').attr('stroke',d=>ROLE_COLOR[d.role])
       .attr('stroke-width',d=>d.role==='victim'||d.role==='attacker'?2.5:1.5);
     g.append('text').attr('fill',d=>ROLE_COLOR[d.role]).attr('font-family','Inter,monospace')
@@ -677,13 +796,41 @@ function redraw(){
     g.transition().duration(400).style('opacity',1);return g;
   }, update=>{
     update.select('circle')
-      .attr('r',d=>d.id==='Sx'?25:d.role==='attacker'?20:18)
+      .attr('r',d=>d.id==='Sx'||d.id==='Ax'?25:d.role==='attacker'?20:18)
       .attr('fill',d=>ROLE_COLOR[d.role]+'22')
       .attr('stroke',d=>ROLE_COLOR[d.role]);
     update.select('text').text(d=>d.label||d.id);
     return update;
   });
   if(sim){sim.nodes(nodes);sim.force('link').links(links);sim.alpha(0.4).restart();}
+}
+function findLink(a,b){
+  return links.find(l=>{
+    const s=l.source.id??l.source,t=l.target.id??l.target;
+    return(s===a&&t===b)||(s===b&&t===a);
+  });
+}
+function pulseHonestPaths(){
+  ['H1','H2','H3'].forEach((h,i)=>{
+    const lk=findLink('Victim',h);
+    if(!lk)return;
+    setTimeout(()=>{
+      lk.style='attention';redraw();
+      flashNode(h,'#a6e3a1',1500);
+      flashNode('Victim','#a6e3a1',900);
+      setTimeout(()=>{lk.style='verified';redraw();},1200);
+    },i*240);
+  });
+}
+function dimUnacceptedAttackers(){
+  const accepted=new Set();
+  links.forEach(l=>{
+    const s=l.source.id??l.source,t=l.target.id??l.target;
+    if(s==='Victim'&&/^A\d+$/.test(t))accepted.add(t);
+    if(t==='Victim'&&/^A\d+$/.test(s))accepted.add(s);
+  });
+  nodeGroup.selectAll('g.node').filter(d=>d.role==='attacker'&&!accepted.has(d.id))
+    .transition().duration(600).style('opacity',0.35);
 }
 function animatePacket(from,to,color='#cba6f7'){
   const a=nodes.find(n=>n.id===from),b=nodes.find(n=>n.id===to);if(!a||!b)return;
@@ -837,7 +984,7 @@ function activateScenario(key){
 
 /* ─── BUTTONS ──────────────────────────────────────────── */
 function setBtns(disabled){
-  ['btn-sybil','btn-eclipse','btn-partition','btn-tls-mitm','btn-noise'].forEach(id=>{
+  ['btn-sybil','btn-eclipse','btn-partition','btn-tls-mitm','btn-noise','btn-bootstrap'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.disabled=disabled;
   });
 }
@@ -873,9 +1020,17 @@ function handleEvent(ev){
     case 'scenario_reset':resetGraph();break;
 
     case 'node_spawned':
+      if(sc==='bootstrap'&&ev.role==='honest'){
+        raw('+',`${ev.id} (honest) [background]`);
+        if(ev.id==='N3')narr('~','honest network ready (Seed_H + N1–N3)');
+        break;
+      }
       if(sc==='sybil'&&ev.role==='sybil'&&(state.runParams.count||0)>12&&/^S\d+$/.test(ev.id)&&Number(ev.id.slice(1))>10){
         state.metrics.sybil_hidden=(state.metrics.sybil_hidden||0)+1;
         upsertNode('Sx','sybil',`+${state.metrics.sybil_hidden}`);
+      }else if(sc==='eclipse'&&ev.role==='attacker'&&(state.runParams.count||0)>12&&/^A\d+$/.test(ev.id)&&Number(ev.id.slice(1))>10){
+        state.metrics.attacker_hidden=(state.metrics.attacker_hidden||0)+1;
+        upsertNode('Ax','attacker',`+${state.metrics.attacker_hidden}`);
       }else{
         upsertNode(ev.id,ev.role);
       }
@@ -889,14 +1044,31 @@ function handleEvent(ev){
         if(ev.role==='attacker'){state.metrics.sybil_count=(state.metrics.sybil_count||0)+1;advanceStep(0);}
         else if(ev.role==='honest')state.metrics.honest_count=(state.metrics.honest_count||0)+1;
         updateAll();
+      }else if(sc==='bootstrap'){
+        const nd=nodes.find(n=>n.id===ev.id);
+        if(ev.role==='attacker'&&nd){nd.x=W/2-230;nd.y=H/2-30;advanceStep(1);narr('!','Seed_P (poisoned seed) started');}
+        else if(ev.id==='Bootstrap'&&nd){nd.x=W/2+180;nd.y=H/2-30;advanceStep(2);narr('~','Bootstrap victim connecting to poisoned seed');}
+        else if(ev.role==='sybil'&&nd){
+          const idx=parseInt(ev.id.slice(1))-1;
+          const total=state.runParams.count||8;
+          nd.x=W/2-180+idx*(360/Math.max(1,total-1));nd.y=H/2+145+((idx%2)*-40);
+        }
+        updateAll();
       }
       break;
 
     case 'connection_established':{
       const from=displayNodeId(ev.from),to=displayNodeId(ev.to);
       const fn=nodes.find(n=>n.id===from),tn=nodes.find(n=>n.id===to);
+      if(sc==='bootstrap'&&(!fn||!tn)){
+        raw('~',`${ev.from} ↔ ${ev.to} [background honest env]`);
+        break;
+      }
       let style='normal';
       if(sc==='sybil'&&(fn?.role==='sybil'||tn?.role==='sybil'))style='sybil';
+      else if(sc==='eclipse'&&(fn?.role==='attacker'||tn?.role==='attacker'))style='sybil';
+      else if(sc==='tls-mitm'&&(fn?.role==='attacker'||tn?.role==='attacker'))style='mitm';
+      else if(sc==='bootstrap'&&(fn?.role==='sybil'||tn?.role==='sybil'))style='sybil';
       else if(sc==='noise')style='tls';
       const id=`${from}↔${to}`;
       if(from!==to&&!links.some(l=>l.id===id))links.push({id,source:from,target:to,style});
@@ -906,6 +1078,11 @@ function handleEvent(ev){
       raw('~',`${ev.from} ↔ ${ev.to}`);
       if(sc==='tls-mitm'&&ev.to==='Mallory')narr('+','Mallory inserted');
       if(sc==='noise'&&ev.to==='Mallory')narr('+','Mallory inserted');
+      if(sc==='bootstrap'&&(ev.to==='Bootstrap'||ev.from==='Bootstrap')){
+        const sybilId=ev.from==='Bootstrap'?ev.to:ev.from;
+        flashNode('Bootstrap','#f38ba8',650);
+        narr('!',`${sybilId} → Bootstrap (sybil peer accepted)`);
+      }
       break;
     }
 
@@ -923,27 +1100,52 @@ function handleEvent(ev){
       break;
 
     case 'packet_sent':{
-      const pColor=sc==='noise'?'#a6e3a1':'#cba6f7';
+      const pColor=sc==='bootstrap'?'#f38ba8':sc==='noise'?'#a6e3a1':'#cba6f7';
       animatePacket(ev.from,ev.to,pColor);
       raw('~',`${ev.from} → ${ev.to}  ${ev.data.slice(0,42)}`);
       if(sc==='eclipse'&&ev.data.includes('FAKE')&&!state.metrics.fake_tip){
         state.metrics.fake_tip=true;advanceStep(1);updateAll();
+        flashNode('Victim','#f38ba8',1300);
         narr('~','attacker_tip_FAKE delivered');
       }
       if(sc==='tls-mitm'&&state.stepIndex<2)advanceStep(1);
+      if(sc==='bootstrap'){
+        if(ev.data.includes('GetPeers')){
+          flashNode('Seed_P','#f38ba8',900);
+          narr('~','Bootstrap → GetPeers → Seed_P');
+        }
+        else if(ev.data.includes('poisoned')){
+          flashNode('Seed_P','#f38ba8',1200);
+          flashNode('Bootstrap','#f38ba8',1200);
+          narr('!',`Seed_P → Peers poisoned [${ev.data.slice(0,40)}]`);
+        }
+        else if(ev.data.includes('Hello')&&ev.from==='Bootstrap')narr('~','Bootstrap → Hello → Seed_P');
+      }
       break;
     }
 
     case 'mitm_intercept':
       flashNode(ev.node,'#f38ba8',1200);
       raw('!',`INTERCEPTED by ${ev.node}: ${ev.data.slice(0,36)}`);
-      if(sc==='tls-mitm'){state.metrics.result='Intercepted';advanceStep(1);updateAll();narr('!','session intercepted');}
+      if(sc==='tls-mitm'){
+        state.metrics.attacker_in_path=true;
+        state.metrics.verified_peer=false;
+        state.metrics.session='intercepted';
+        state.metrics.result='Attack success: true';
+        advanceStep(1);updateAll();narr('!','session intercepted');
+      }
       break;
 
     case 'handshake_failed':
       flashNode(ev.from,'#f38ba8',1200);
       raw('x',`${ev.from}: ${ev.reason}`);
-      if(sc==='noise'){state.metrics.mitm_detected=true;advanceStep(1);updateAll();narr('x','remote key mismatch');}
+      if(sc==='noise'){
+        state.metrics.mitm_detected=true;
+        state.metrics.attacker_in_path=true;
+        state.metrics.verified_peer=false;
+        state.metrics.session='blocked';
+        advanceStep(1);updateAll();narr('x','remote key mismatch');
+      }
       break;
 
     case 'peer_verified':{
@@ -951,7 +1153,14 @@ function handleEvent(ev){
       const lk=links.find(l=>{const s=l.source.id??l.source,t=l.target.id??l.target;return(s===ev.from&&t===ev.remote)||(s===ev.remote&&t===ev.from);});
       if(lk){lk.style='verified';redraw();}
       raw('✓',`${ev.from} verified ${ev.remote}`);
-      if(sc==='noise'){state.metrics.verified=true;state.metrics.result='MITM blocked';advanceStep(2);updateAll();narr('✓','Alice verified Bob');}
+      if(sc==='noise'){
+        state.metrics.verified=true;
+        state.metrics.verified_peer=true;
+        state.metrics.attacker_in_path=false;
+        state.metrics.session='authenticated';
+        state.metrics.result='Attack success: false';
+        advanceStep(2);updateAll();narr('✓','Alice verified Bob');
+      }
       break;
     }
 
@@ -966,7 +1175,15 @@ function handleEvent(ev){
         // show raw toggle once we have raw events
         document.getElementById('raw-toggle').style.display='block';
       }
-      if(sc==='eclipse'){advanceStep(2);narr('~','honest peers checked');}
+      if(sc==='eclipse'){
+        advanceStep(2);
+        dimUnacceptedAttackers();
+        pulseHonestPaths();
+        narr('~','honest peers checked');
+      }
+      if(sc==='bootstrap'){
+        narr('!',`Bootstrap peer table full — ${state.runParams.count||'?'} sybil peers accepted`);
+      }
       break;
 
     case 'network_split':
@@ -989,20 +1206,57 @@ function handleEvent(ev){
       const em=msg.match(/victim isolated: (true|false)/);
       if(em&&sc==='eclipse'){
         state.metrics.state_diverged=em[1]==='true';
-        state.metrics.result=em[1]==='true'?'Eclipse succeeded':'Eclipse failed';
+        state.metrics.result=em[1]==='true'?'Success: true':'Success: false';
         state.metrics.fake_tip=true;
+        const hm=msg.match(/honest_peers: (\d+)/);
+        const sm2=msg.match(/sybil_peers: (\d+)/);
+        const om=msg.match(/occupancy: ([\d.]+)/);
+        const mm=msg.match(/max_peers: (\d+)/);
+        if(hm)state.metrics.honest_count=parseInt(hm[1]);
+        if(sm2)state.metrics.sybil_count=parseInt(sm2[1]);
+        if(om)state.metrics.occupancy=parseFloat(om[1]);
+        if(mm)state.metrics.max_peers=parseInt(mm[1]);
       }
-      if(sc==='tls-mitm'&&!state.metrics.result)state.metrics.result='Intercepted';
+      if(sc==='tls-mitm'&&!state.metrics.result){
+        state.metrics.attacker_in_path=true;
+        state.metrics.verified_peer=false;
+        state.metrics.session='intercepted';
+        state.metrics.result='Attack success: true';
+      }
+      const bm=msg.match(/sybil_ratio:\s*([\d.]+)%.*sybil_peers:\s*(\d+).*honest_peers:\s*(\d+).*total_peers:\s*(\d+)/);
+      if(bm&&sc==='bootstrap'){
+        state.metrics.sybil_ratio=parseFloat(bm[1]);
+        state.metrics.sybil_peers=parseInt(bm[2]);
+        state.metrics.honest_peers=parseInt(bm[3]);
+        state.metrics.total_peers=parseInt(bm[4]);
+        state.metrics.result=parseFloat(bm[1])>=50?'Poisoned':'Partial';
+      }
       advanceStep(2);updateAll();
       raw('done',msg);
 
       // narrative summary
-      arrangeFinalGraph();
+      arrangeFinalGraph(true);
       if(sc==='sybil')narr('done',`occupancy = ${pct(state.metrics.occupancy)}`);
-      else if(sc==='eclipse')narr(state.metrics.state_diverged?'!':'✓',`${state.metrics.result||'Eclipse complete'}; honest peers remaining = ${state.metrics.honest_count??'—'}`);
+      else if(sc==='eclipse'){
+        narr(state.metrics.state_diverged?'!':'✓',`${state.metrics.result||'Eclipse complete'}; honest peers remaining = ${state.metrics.honest_count??'—'}`);
+        // visual signal: if Eclipse failed, highlight surviving honest connections
+        if(!state.metrics.state_diverged){
+          dimUnacceptedAttackers();
+          ['H1','H2','H3'].forEach(h=>{
+            const lk=findLink('Victim',h);
+            if(lk){lk.style='verified';redraw();}
+            flashNode(h,'#a6e3a1',2000);
+          });
+          pulseHonestPaths();
+          flashNode('Victim','#a6e3a1',1500);
+        }
+      }
       else if(sc==='partition')narr('done','partition measured');
-      else if(sc==='tls-mitm')narr('done','MITM succeeded — no authentication');
-      else if(sc==='noise')narr('done','Noise session established');
+      else if(sc==='tls-mitm')narr('done','Attack success: true; verified_peer=false');
+      else if(sc==='noise')narr('done','Attack success: false; verified_peer=true');
+      else if(sc==='bootstrap'){
+        narr(parseFloat(state.metrics.sybil_ratio)>=50?'!':'~',`bootstrap_sybil_ratio = ${pct(state.metrics.sybil_ratio)}`);
+      }
 
       document.getElementById('raw-toggle').style.display='block';
       setBtns(false);
@@ -1030,9 +1284,10 @@ function getParams(scenario){
       const preset=activeSybilPreset();
       return{count:clamp('param-sybil',1,100),max_peers:preset.maxPeers,sybilPreset:state.sybilPreset};
     }
-    case 'eclipse':  return{count:clamp('param-eclipse',1,cap)};
-    case 'partition':return{count:clamp('param-partition',1,8)};
-    default:         return{};
+    case 'eclipse':  {const ep=activeEclipsePreset();return{count:clamp('param-eclipse',1,100),max_peers:ep.maxPeers};}
+    case 'partition':  return{count:clamp('param-partition',1,8)};
+    case 'bootstrap':  return{count:clamp('param-bootstrap',1,20)};
+    default:           return{};
   }
 }
 
@@ -1041,14 +1296,22 @@ async function run(scenario){
   setBtns(true);
   const params=getParams(scenario);
   state.runParams=params;
+
+  // Eclipse Article preset: gym CLI has no defense; auto-switch to Off
+  if(scenario==='eclipse'){
+    state.defensePolicy='none';
+    document.querySelectorAll('.toggle-opt').forEach(b=>b.classList.toggle('active',b.dataset.policy==='none'));
+  }
+
   activateScenario(scenario);
 
   // narrative opener
   if(scenario==='sybil')narr('+','4 honest peers connected');
   else if(scenario==='eclipse')narr('+','Honest peers connected');
   else if(scenario==='partition')narr('~','cross links exist');
-  else if(scenario==='tls-mitm')narr('+','MITM attempt started');
-  else if(scenario==='noise')narr('+','Noise handshake started');
+  else if(scenario==='tls-mitm')narr('+','Relay attack started');
+  else if(scenario==='noise')narr('+','Relay attempt under key verification');
+  else if(scenario==='bootstrap')narr('+','Poisoned seed started — waiting for victim to bootstrap');
 
   if(scenario==='sybil'&&params.count)setTimeout(()=>narr('+',`${params.count} Sybil identities spawned`),800);
   if(scenario==='eclipse'&&params.count)setTimeout(()=>narr('+',`${params.count} Sybil peers connecting`),800);
@@ -1078,6 +1341,19 @@ document.querySelectorAll('.preset-btn').forEach(btn=>{
       state.runParams={count:preset.count,max_peers:preset.maxPeers,sybilPreset:state.sybilPreset};
       updateAll();
     }
+  });
+});
+
+// Eclipse preset buttons
+document.querySelectorAll('[data-eclipsepreset]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    state.eclipsePreset=btn.dataset.eclipsepreset;
+    const preset=activeEclipsePreset();
+    document.querySelectorAll('[data-eclipsepreset]').forEach(b=>b.classList.toggle('active',b===btn));
+    const input=document.getElementById('param-eclipse');
+    if(input){input.value=preset.count;input.classList.remove('over');input.title='';}
+    const hint=document.getElementById('hint-eclipse');
+    if(hint)hint.textContent=`(${preset.label})`;
   });
 });
 
